@@ -43,6 +43,9 @@ final class WhatsAppSessionLifecycleService
             }
 
             $changes = ['status' => $to];
+            if (in_array($to, [Status::Initializing, Status::QrPending, Status::Authenticating, Status::Authenticated, Status::Ready], true)) {
+                $changes += ['failure_code' => null, 'failure_message' => null];
+            }
             if ($to === Status::Authenticated) {
                 $changes['authenticated_at'] = now();
             }
@@ -73,7 +76,7 @@ final class WhatsAppSessionLifecycleService
         }
         Cache::put($this->qrKey($session), encrypt($qr), now()->addSeconds(config('whatsapp.qr_ttl_seconds')));
         $session->increment('qr_generation_count');
-        $session->update(['last_qr_generated_at' => now()]);
+        $session->update(['last_qr_generated_at' => now(), 'failure_code' => null, 'failure_message' => null]);
         if ($session->status !== Status::QrPending) {
             $this->transition($session, Status::QrPending, 'connector');
         }
