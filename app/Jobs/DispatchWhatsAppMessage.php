@@ -9,6 +9,7 @@ use App\Enums\WhatsAppSessionStatus;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppMessageAttempt;
 use App\Services\WhatsAppMessageLifecycleService;
+use App\Services\WhatsAppSessionPacer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -31,7 +32,7 @@ final class DispatchWhatsAppMessage implements ShouldQueue
         return [(new WithoutOverlapping("wa:message:{$this->messageId}"))->expireAfter(120)];
     }
 
-    public function handle(MessagingConnector $connector, WhatsAppMessageLifecycleService $lifecycle): void
+    public function handle(MessagingConnector $connector, WhatsAppMessageLifecycleService $lifecycle, WhatsAppSessionPacer $pacer): void
     {
         $message = WhatsAppMessage::with(['session', 'attachment'])->findOrFail($this->messageId);
         if ($message->status !== WhatsAppMessageStatus::Queued) {
@@ -47,6 +48,14 @@ final class DispatchWhatsAppMessage implements ShouldQueue
 
             return;
         }
+
+        $waitMs = $pacer->reserve($message->session);
+        if ($waitMs > 0) {
+            self::dispatch($message->id)->delay(now()->addMilliseconds($waitMs));
+
+            return;
+        }
+
         $message = $lifecycle->transition($message, WhatsAppMessageStatus::Processing, 'queue');
         $requestId = (string) Str::uuid();
         $attempt = $message->attempts + 1;
