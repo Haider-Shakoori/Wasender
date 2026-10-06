@@ -44,7 +44,7 @@ export class SessionManager implements SessionRuntime {
       puppeteer: {
         headless: true,
         executablePath: this.config.chromiumPath,
-        protocolTimeout: this.config.chromiumProtocolTimeoutMs,
+        protocolTimeout: this.config.chromiumProtocolTimeoutMs ?? 180_000,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
       },
     });
