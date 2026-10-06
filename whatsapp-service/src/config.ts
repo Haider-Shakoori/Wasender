@@ -27,6 +27,8 @@ export type Config = {
     maxRestarts: number;
     restartWindowMs: number;
     restartBaseDelayMs: number;
+    maxActive: number;
+    diskCriticalPercent: number;
   };
   campaign: {
     enabled: boolean;
@@ -55,7 +57,9 @@ export function loadConfig(): Config {
   const workerMaxRestarts = Number(process.env.SESSION_WORKER_MAX_RESTARTS ?? 5);
   const workerRestartWindowMs = Number(process.env.SESSION_WORKER_RESTART_WINDOW_SECONDS ?? 600) * 1000;
   const workerRestartBaseDelayMs = Number(process.env.SESSION_WORKER_RESTART_BASE_DELAY_MS ?? 2000);
-  if (![port, callbackTimeoutMs, maxReconnectAttempts, sessionLeaseTtlMs, messageRequestTtlMs, workerRequestTimeoutMs, workerMaxRestarts, workerRestartWindowMs, workerRestartBaseDelayMs].every(Number.isFinite)) {
+  const workerMaxActive = Number(process.env.SESSION_WORKER_MAX_ACTIVE ?? 50);
+  const diskCriticalPercent = Number(process.env.WHATSAPP_AUTH_DISK_CRITICAL_PERCENT ?? 95);
+  if (![port, callbackTimeoutMs, maxReconnectAttempts, sessionLeaseTtlMs, messageRequestTtlMs, workerRequestTimeoutMs, workerMaxRestarts, workerRestartWindowMs, workerRestartBaseDelayMs, workerMaxActive, diskCriticalPercent].every(Number.isFinite)) {
     throw new Error('Numeric connector configuration is invalid');
   }
 
@@ -80,6 +84,8 @@ export function loadConfig(): Config {
       maxRestarts: workerMaxRestarts,
       restartWindowMs: workerRestartWindowMs,
       restartBaseDelayMs: workerRestartBaseDelayMs,
+      maxActive: Math.max(1, Math.floor(workerMaxActive)),
+      diskCriticalPercent: Math.min(100, Math.max(1, diskCriticalPercent)),
     },
     campaign: {
       enabled: (process.env.CAMPAIGN_TRANSPORT_ENABLED ?? 'true') === 'true',
