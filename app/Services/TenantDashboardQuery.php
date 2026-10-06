@@ -32,9 +32,9 @@ final class TenantDashboardQuery
         $workspaceMetrics = DB::table('tenants')
             ->where('tenants.id', $tenant->id)
             ->selectSub(
-                fn ($query) => $query->from('tenant_memberships')
+                fn ($query) => $query->from('tenant_user')
                     ->selectRaw('COUNT(*)')
-                    ->whereColumn('tenant_memberships.tenant_id', 'tenants.id')
+                    ->whereColumn('tenant_user.tenant_id', 'tenants.id')
                     ->where('status', MembershipStatus::Active->value),
                 'active_members',
             )
