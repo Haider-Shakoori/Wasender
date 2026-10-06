@@ -16,6 +16,7 @@ export type Config = {
   authRoot: string;
   chromiumPath?: string;
   chromiumProtocolTimeoutMs?: number;
+  whatsappAuthTimeoutMs?: number;
   callbackTimeoutMs: number;
   callbackOutboxRoot: string;
   maxReconnectAttempts: number;
@@ -55,14 +56,15 @@ export function loadConfig(): Config {
   const maxReconnectAttempts = Number(process.env.MAX_RECONNECT_ATTEMPTS ?? 5);
   const sessionLeaseTtlMs = Number(process.env.SESSION_LEASE_TTL_SECONDS ?? 180) * 1000;
   const messageRequestTtlMs = Number(process.env.MESSAGE_REQUEST_TTL_HOURS ?? 168) * 3_600_000;
-  const chromiumProtocolTimeoutMs = Number(process.env.PUPPETEER_PROTOCOL_TIMEOUT_MS ?? 180000);
+  const chromiumProtocolTimeoutMs = Number(process.env.PUPPETEER_PROTOCOL_TIMEOUT_MS ?? 300000);
+  const whatsappAuthTimeoutMs = Number(process.env.WHATSAPP_AUTH_TIMEOUT_MS ?? 180000);
   const workerRequestTimeoutMs = Number(process.env.SESSION_WORKER_REQUEST_TIMEOUT_MS ?? 210000);
   const workerMaxRestarts = Number(process.env.SESSION_WORKER_MAX_RESTARTS ?? 5);
   const workerRestartWindowMs = Number(process.env.SESSION_WORKER_RESTART_WINDOW_SECONDS ?? 600) * 1000;
   const workerRestartBaseDelayMs = Number(process.env.SESSION_WORKER_RESTART_BASE_DELAY_MS ?? 2000);
   const workerMaxActive = Number(process.env.SESSION_WORKER_MAX_ACTIVE ?? 50);
   const diskCriticalPercent = Number(process.env.WHATSAPP_AUTH_DISK_CRITICAL_PERCENT ?? 95);
-  if (![port, callbackTimeoutMs, maxReconnectAttempts, sessionLeaseTtlMs, messageRequestTtlMs, chromiumProtocolTimeoutMs, workerRequestTimeoutMs, workerMaxRestarts, workerRestartWindowMs, workerRestartBaseDelayMs, workerMaxActive, diskCriticalPercent].every(Number.isFinite)) {
+  if (![port, callbackTimeoutMs, maxReconnectAttempts, sessionLeaseTtlMs, messageRequestTtlMs, chromiumProtocolTimeoutMs, whatsappAuthTimeoutMs, workerRequestTimeoutMs, workerMaxRestarts, workerRestartWindowMs, workerRestartBaseDelayMs, workerMaxActive, diskCriticalPercent].every(Number.isFinite)) {
     throw new Error('Numeric connector configuration is invalid');
   }
 
@@ -76,6 +78,7 @@ export function loadConfig(): Config {
     authRoot: path.resolve(process.env.WHATSAPP_AUTH_ROOT ?? './storage/auth'),
     chromiumPath: process.env.PUPPETEER_EXECUTABLE_PATH,
     chromiumProtocolTimeoutMs,
+    whatsappAuthTimeoutMs,
     callbackTimeoutMs,
     callbackOutboxRoot: path.resolve(process.env.CALLBACK_OUTBOX_ROOT ?? './storage/callback-outbox'),
     maxReconnectAttempts,
