@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { CallbackClient } from './callback-client.js';
 import { loadConfig } from './config.js';
 import { SessionManager } from './session-manager.js';
@@ -5,7 +6,7 @@ import type { CampaignSendInput, DirectSendInput, SessionInput } from './session
 import type { WorkerMessage, WorkerRequest, WorkerResponse } from './session-worker-protocol.js';
 
 const config = loadConfig();
-const callbacks = new CallbackClient(config.callbackUrl, config.hmacSecret, config.callbackTimeoutMs);
+const callbacks = new CallbackClient(config.callbackUrl, config.hmacSecret, config.callbackTimeoutMs, path.join(config.callbackOutboxRoot, `${process.env.SESSION_WORKER_UUID ?? 'worker'}.json`));
 const runtime = new SessionManager(config, callbacks);
 let current: SessionInput | undefined;
 let shuttingDown = false;
