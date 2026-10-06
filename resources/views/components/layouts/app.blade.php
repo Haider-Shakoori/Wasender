@@ -7,7 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Dashboard' }} · {{ config('saas.product_name') }}</title>
     <script>
-        (() => { const allowed=['light','dark','system']; let mode=localStorage.getItem('relay-theme'); if(!allowed.includes(mode)) mode='system'; const dark=mode==='dark'||(mode==='system'&&matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.classList.toggle('dark',dark); document.documentElement.dataset.theme=mode; })();
+        (() => { const allowed=['light','dark','system']; let mode=localStorage.getItem('wasender-theme'); if(!allowed.includes(mode)) mode='system'; const dark=mode==='dark'||(mode==='system'&&matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.classList.toggle('dark',dark); document.documentElement.dataset.theme=mode; })();
     </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -18,7 +18,7 @@
     <aside id="app-navigation" class="fixed inset-y-0 left-0 z-50 flex w-[min(88vw,288px)] -translate-x-full flex-col bg-[var(--sidebar)] text-[var(--sidebar-text)] shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:w-auto lg:translate-x-0 lg:shadow-none" :class="mobileOpen && 'translate-x-0'" aria-label="Application navigation">
         <div class="flex h-18 items-center justify-between border-b border-white/8 px-5">
             <a href="{{ route('tenant.dashboard') }}" class="flex min-w-0 items-center gap-3 rounded-lg">
-                <span class="grid size-9 place-items-center rounded-xl bg-[var(--accent)] text-sm font-black text-[var(--accent-ink)]">R</span>
+                <span class="grid size-9 place-items-center rounded-xl bg-[var(--accent)] text-sm font-black text-[var(--accent-ink)]">W</span>
                 <span class="min-w-0"><span class="block truncate text-sm font-semibold">{{ config('saas.product_name') }}</span><span class="block truncate text-[11px] text-[var(--sidebar-muted)]">Control plane</span></span>
             </a>
             <button class="grid size-9 place-items-center rounded-lg text-[var(--sidebar-muted)] hover:bg-white/8 hover:text-white lg:hidden" @click="mobileOpen=false" aria-label="Close navigation">×</button>
