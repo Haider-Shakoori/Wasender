@@ -151,6 +151,7 @@ export class SessionSupervisor implements SessionRuntime {
       auth_disk_used_percent: disk.usedPercent,
       auth_disk_free_mb: disk.freeMb,
       auth_disk_critical: disk.usedPercent !== null && disk.usedPercent >= this.config.sessionWorkers.diskCriticalPercent,
+      callback_backlog: this.callbacks.health().callback_backlog,
       ready_sessions: states.filter((state) => state === 'ready').length,
       reconnecting_sessions: states.filter((state) => state === 'reconnecting').length + this.restartTimers.size,
       crash_loop_sessions: this.crashLoops.size,
