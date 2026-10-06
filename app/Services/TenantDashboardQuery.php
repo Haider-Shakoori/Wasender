@@ -39,9 +39,9 @@ final class TenantDashboardQuery
                 'active_members',
             )
             ->selectSub(
-                fn ($query) => $query->from('invitations')
+                fn ($query) => $query->from('tenant_invitations')
                     ->selectRaw('COUNT(*)')
-                    ->whereColumn('invitations.tenant_id', 'tenants.id')
+                    ->whereColumn('tenant_invitations.tenant_id', 'tenants.id')
                     ->where('status', TenantInvitationStatus::Pending->value)
                     ->where('expires_at', '>', now()),
                 'pending_invitations',
