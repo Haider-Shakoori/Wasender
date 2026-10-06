@@ -70,8 +70,10 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('whatsapp_conversation_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('whatsapp_conversation_label_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('whatsapp_conversation_id');
+            $table->foreign('whatsapp_conversation_id', 'wa_label_assign_conv_fk')->references('id')->on('whatsapp_conversations')->cascadeOnDelete();
+            $table->foreignId('whatsapp_conversation_label_id');
+            $table->foreign('whatsapp_conversation_label_id', 'wa_label_assign_label_fk')->references('id')->on('whatsapp_conversation_labels')->cascadeOnDelete();
             $table->foreignId('assigned_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('created_at')->useCurrent();
             $table->unique(['whatsapp_conversation_id', 'whatsapp_conversation_label_id'], 'wa_conv_label_uq');
@@ -80,7 +82,8 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('whatsapp_conversation_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('whatsapp_conversation_id');
+            $table->foreign('whatsapp_conversation_id', 'wa_activity_conv_fk')->references('id')->on('whatsapp_conversations')->cascadeOnDelete();
             $table->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('activity_type', 40);
             $table->uuid('subject_uuid')->nullable();
