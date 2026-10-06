@@ -1,0 +1,219 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is required}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: &laravel_runtime
+      DB_HOST: mysql
+      REDIS_HOST: redis
+      WHATSAPP_CONNECTOR_URL: http://whatsapp:3100
+    volumes:
+      - laravel-storage:/var/www/html/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 60s
+    logging: *logging
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    depends_on:
+      - app
+    logging: *logging
+
+  worker-whatsapp:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *laravel_runtime
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=whatsapp-sessions,whatsapp-messages,inbox,chatbot,default
+      - --sleep=1
+      - --tries=3
+      - --timeout=180
+      - --max-time=3600
+    volumes:
+      - laravel-storage:/var/www/html/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      whatsapp:
+        condition: service_healthy
+    stop_grace_period: 120s
+    logging: *logging
+
+  worker-campaigns:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *laravel_runtime
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=campaign-control,campaign-preparation,campaign-dispatch,campaign-retry,campaign-reconciliation
+      - --sleep=1
+      - --tries=3
+      - --timeout=240
+      - --max-time=3600
+    volumes:
+      - laravel-storage:/var/www/html/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      whatsapp:
+        condition: service_healthy
+    stop_grace_period: 180s
+    logging: *logging
+
+  worker-background:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *laravel_runtime
+    command:
+      - php
+      - artisan
+      - queue:work
+      - redis
+      - --queue=automation-control,automation-steps,automation-delays,integration-webhooks,contact-imports
+      - --sleep=2
+      - --tries=3
+      - --timeout=240
+      - --max-time=3600
+    volumes:
+      - laravel-storage:/var/www/html/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 180s
+    logging: *logging
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment: *laravel_runtime
+    command: ["php", "artisan", "schedule:work"]
+    volumes:
+      - laravel-storage:/var/www/html/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 60s
+    logging: *logging
+
+  whatsapp:
+    build:
+      context: .
+      dockerfile: docker/whatsapp/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - whatsapp-service/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3100
+      LARAVEL_CALLBACK_URL: http://web/internal/whatsapp/events
+      LARAVEL_INTERNAL_BASE_URL: http://web
+      WHATSAPP_AUTH_ROOT: /var/lib/wasender/whatsapp/auth
+      CALLBACK_OUTBOX_ROOT: /var/lib/wasender/whatsapp/callback-outbox
+      MESSAGE_REQUEST_STORE_PATH: /var/lib/wasender/whatsapp/message-requests.json
+      CAMPAIGN_TRANSPORT_STORE_PATH: /var/lib/wasender/whatsapp/campaign-transport.json
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+    volumes:
+      - whatsapp-runtime:/var/lib/wasender/whatsapp
+    depends_on:
+      - web
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+    stop_grace_period: 60s
+    logging: *logging
+
+volumes:
+  mysql-data:
+  redis-data:
+  laravel-storage:
+  whatsapp-runtime:
