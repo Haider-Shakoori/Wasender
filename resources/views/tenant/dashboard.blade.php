@@ -111,6 +111,7 @@
                 <dl class="mt-5 space-y-4 text-sm">
                     <div class="flex justify-between gap-4"><dt class="text-[var(--text-muted)]">Team members</dt><dd class="font-medium">{{ number_format($activeMembers) }}</dd></div>
                     <div class="flex justify-between gap-4"><dt class="text-[var(--text-muted)]">Pending invites</dt><dd class="font-medium">{{ number_format($pendingInvitations) }}</dd></div>
+                    <div class="flex justify-between gap-4"><dt class="text-[var(--text-muted)]">Custom roles</dt><dd class="font-medium">{{ number_format($customRoles) }}</dd></div>
                     <div class="flex justify-between gap-4"><dt class="text-[var(--text-muted)]">Your role</dt><dd class="font-medium">{{ $membership->role->name }}</dd></div>
                     <div class="flex justify-between gap-4"><dt class="text-[var(--text-muted)]">Timezone</dt><dd class="truncate font-medium">{{ $tenant->timezone }}</dd></div>
                 </dl>
