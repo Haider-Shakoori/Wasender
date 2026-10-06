@@ -5,6 +5,8 @@ return [
     'body_max' => 4096,
     'expires_minutes' => (int) env('WHATSAPP_MESSAGE_EXPIRES_MINUTES', 30),
     'max_attempts' => (int) env('WHATSAPP_MESSAGE_MAX_ATTEMPTS', 3),
+    'send_delay_min_ms' => (int) env('WHATSAPP_SEND_DELAY_MIN_MS', 5000),
+    'send_delay_max_ms' => (int) env('WHATSAPP_SEND_DELAY_MAX_MS', 7000),
     'attachment_disk' => env('WHATSAPP_ATTACHMENT_DISK', 'local'),
     'attachment_max_kb' => (int) env('WHATSAPP_ATTACHMENT_MAX_KB', 16384),
     'mimes' => [
