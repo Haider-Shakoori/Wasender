@@ -9,12 +9,18 @@ use App\Services\WhatsAppMessageLifecycleService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use RuntimeException;
 
 final class ReconcileWhatsAppMessage implements ShouldQueue
 {
     use Queueable;
 
     public int $tries = 3;
+
+    public function backoff(): array
+    {
+        return [10, 30, 60];
+    }
 
     public function __construct(public int $messageId)
     {
@@ -35,6 +41,12 @@ final class ReconcileWhatsAppMessage implements ShouldQueue
         $result = $connector->reconcile($message->connector_request_id);
         if ($result->accepted && $result->externalId) {
             $lifecycle->transition($message, WhatsAppMessageStatus::Sent, 'system', ['whatsapp_message_id' => $result->externalId]);
+
+            return;
+        }
+
+        if ($result->retryable) {
+            throw new RuntimeException($result->errorCode ?? 'reconciliation_unavailable');
         }
     }
 }

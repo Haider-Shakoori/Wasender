@@ -75,7 +75,8 @@ final class DispatchWhatsAppMessage implements ShouldQueue
             $lifecycle->transition($message->refresh(), WhatsAppMessageStatus::Sent, 'connector', ['whatsapp_message_id' => $result->externalId]);
             WhatsAppMessageAttempt::where('connector_request_id', $requestId)->update(['completed_at' => now(), 'status' => 'sent']);
         } catch (Throwable) {
-            $lifecycle->transition($message->refresh(), WhatsAppMessageStatus::Failed, 'connector', ['failure_code' => 'ambiguous_transport', 'failure_message' => 'The send result is uncertain and requires reconciliation.', 'failure_retryable' => false]);
+            $failed = $lifecycle->transition($message->refresh(), WhatsAppMessageStatus::Failed, 'connector', ['failure_code' => 'ambiguous_transport', 'failure_message' => 'The send result is uncertain and requires reconciliation.', 'failure_retryable' => false]);
+            ReconcileWhatsAppMessage::dispatch($failed->id)->delay(now()->addSeconds(10));
         }
     }
 }

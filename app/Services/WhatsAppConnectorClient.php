@@ -82,8 +82,14 @@ final class WhatsAppConnectorClient implements MessagingConnector
             $result = $this->rawRequest('GET', "/internal/messages/requests/{$requestId}");
 
             return new SendMessageResult((bool) ($result['accepted'] ?? false), $result['whatsapp_message_id'] ?? null);
-        } catch (RequestException) {
-            return new SendMessageResult(false, null, 'reconciliation_unavailable');
+        } catch (RequestException $exception) {
+            $code = (string) ($exception->response?->json('error') ?? 'reconciliation_unavailable');
+
+            return match ($code) {
+                'request_outcome_unknown' => new SendMessageResult(false, null, 'ambiguous_transport', false),
+                'request_in_progress' => new SendMessageResult(false, null, 'request_in_progress', true),
+                default => new SendMessageResult(false, null, 'reconciliation_unavailable', true),
+            };
         }
     }
 
