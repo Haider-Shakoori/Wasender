@@ -7,6 +7,7 @@ function required(name: string): string {
 }
 
 export type Config = {
+  host: string;
   port: number;
   instanceId?: string;
   sessionLeaseTtlMs?: number;
@@ -64,6 +65,7 @@ export function loadConfig(): Config {
   }
 
   return {
+    host: process.env.HOST?.trim() || '127.0.0.1',
     port,
     instanceId: process.env.CONNECTOR_INSTANCE_ID?.trim() || process.env.HOSTNAME?.trim() || `connector-${process.pid}`,
     sessionLeaseTtlMs,
