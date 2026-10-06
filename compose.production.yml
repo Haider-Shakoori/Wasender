@@ -194,7 +194,6 @@ services:
       CALLBACK_OUTBOX_ROOT: /var/lib/wasender/whatsapp/callback-outbox
       MESSAGE_REQUEST_STORE_PATH: /var/lib/wasender/whatsapp/message-requests.json
       CAMPAIGN_TRANSPORT_STORE_PATH: /var/lib/wasender/whatsapp/campaign-transport.json
-      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
     volumes:
       - whatsapp-runtime:/var/lib/wasender/whatsapp
     depends_on:
