@@ -22,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/health',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // The app is only reachable through the private Docker reverse-proxy network.
+        // Trust forwarded scheme/host headers so HTTPS URLs are generated correctly behind Caddy + Nginx.
+        $middleware->trustProxies(at: '*');
         $middleware->append(AddSecurityHeaders::class);
         $middleware->alias([
             'tenant.context' => ResolveTenantContext::class,
