@@ -19,7 +19,7 @@ final class WhatsAppSessionController extends Controller
 {
     public function index(WhatsAppSessionQuery $query): View
     {
-        return view('tenant.whatsapp.index', ['sessions' => $query->paginate()]);
+        return view('tenant.whatsapp.index', ['sessions' => $query->paginate(), 'summary' => $query->summary()]);
     }
 
     public function store(Request $request, TenantContext $context, WhatsAppSessionService $service): RedirectResponse
@@ -45,8 +45,15 @@ final class WhatsAppSessionController extends Controller
             'status_label' => $model->status->label(),
             'qr_available' => $qrAvailable,
             'qr_generation_count' => $qrAvailable ? $model->qr_generation_count : null,
+            'phone_number' => $model->phone_number,
+            'display_name' => $model->display_name,
+            'last_seen_at' => $model->last_seen_at?->toIso8601String(),
+            'ready_at' => $model->ready_at?->toIso8601String(),
+            'reconnect_attempts' => $model->reconnect_attempts,
+            'failure_code' => $model->failure_code,
+            'failure_message' => $model->failure_message,
             'last_updated_at' => $model->updated_at->toIso8601String(),
-            'next_poll_after_ms' => $model->status->isTransitional() ? 3000 : null,
+            'next_poll_after_ms' => $model->status->isTransitional() ? 3000 : ($model->status === WhatsAppSessionStatus::Ready ? 10000 : null),
         ]);
     }
 
