@@ -25,12 +25,12 @@ describe('WhatsApp ready recovery', () => {
     })).toBe(false);
   });
 
-  it('does not reinject after the WWebJS bridge exists', () => {
+  it('retries when WWebJS exists but full client readiness may still be incomplete', () => {
     expect(shouldRetryReadyInjection({
       socketState: 'CONNECTED',
       hasSynced: true,
       bridgeInjected: true,
-    })).toBe(false);
+    })).toBe(true);
   });
 
   it('uses bounded backoff instead of retrying forever', () => {
