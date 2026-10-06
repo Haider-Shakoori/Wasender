@@ -4,6 +4,7 @@ namespace App\Services\Billing;
 
 use App\Contracts\BillingGateway;
 use App\Models\PaymentGatewayConfig;
+use App\Models\SubscriptionPlan;
 use App\Models\TenantSubscription;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -18,9 +19,9 @@ final class StripeBillingGateway implements BillingGateway
         return 'stripe';
     }
 
-    public function createCheckout(TenantSubscription $subscription, string $successUrl, string $cancelUrl): string
+    public function createCheckout(TenantSubscription $subscription, SubscriptionPlan $plan, string $successUrl, string $cancelUrl): string
     {
-        $subscription->loadMissing(['tenant', 'plan']);
+        $subscription->loadMissing('tenant');
         $credentials = (array) $this->config->credentials_encrypted;
         $secret = (string) ($credentials['secret_key'] ?? '');
 
@@ -28,7 +29,7 @@ final class StripeBillingGateway implements BillingGateway
             throw new RuntimeException('stripe_not_configured');
         }
 
-        $interval = $subscription->plan->billing_interval->value === 'yearly' ? 'year' : 'month';
+        $interval = $plan->billing_interval->value === 'yearly' ? 'year' : 'month';
         $response = Http::asForm()
             ->withToken($secret)
             ->timeout(20)
@@ -40,10 +41,11 @@ final class StripeBillingGateway implements BillingGateway
                 'customer_email' => $subscription->tenant->email,
                 'metadata[tenant_uuid]' => $subscription->tenant->uuid,
                 'metadata[subscription_uuid]' => $subscription->uuid,
+                'metadata[target_plan_uuid]' => $plan->uuid,
                 'line_items[0][quantity]' => 1,
-                'line_items[0][price_data][currency]' => strtolower($subscription->plan->price_currency),
-                'line_items[0][price_data][unit_amount]' => (int) $subscription->plan->price_amount,
-                'line_items[0][price_data][product_data][name]' => $subscription->plan->name,
+                'line_items[0][price_data][currency]' => strtolower($plan->price_currency),
+                'line_items[0][price_data][unit_amount]' => (int) $plan->price_amount,
+                'line_items[0][price_data][product_data][name]' => $plan->name,
                 'line_items[0][price_data][recurring][interval]' => $interval,
             ])
             ->throw()
