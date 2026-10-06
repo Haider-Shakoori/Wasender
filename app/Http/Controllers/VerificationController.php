@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Throwable;
 
 final class VerificationController extends Controller
 {
@@ -28,7 +29,13 @@ final class VerificationController extends Controller
 
     public function resend(Request $request): RedirectResponse
     {
-        $request->user()->sendEmailVerificationNotification();
+        try {
+            $request->user()->sendEmailVerificationNotification();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'We could not send the verification email right now. Please try again shortly.');
+        }
 
         return back()->with('status', 'Verification link sent.');
     }
