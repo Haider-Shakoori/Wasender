@@ -6,6 +6,7 @@ use App\Models\PlatformIncident;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Throwable;
 
 final class PlatformIncidentService
 {
@@ -76,12 +77,16 @@ final class PlatformIncidentService
             return;
         }
 
-        Mail::raw(
-            "{$incident->title}\n\n{$incident->message}\n\nSeverity: {$incident->severity}\nOccurrences: {$incident->occurrences}",
-            fn ($mail) => $mail->to($recipient)->subject("[Wasender {$incident->severity}] {$incident->title}"),
-        );
+        try {
+            Mail::raw(
+                "{$incident->title}\n\n{$incident->message}\n\nSeverity: {$incident->severity}\nOccurrences: {$incident->occurrences}",
+                fn ($mail) => $mail->to($recipient)->subject("[Wasender {$incident->severity}] {$incident->title}"),
+            );
 
-        $incident->update(['last_notified_at' => now()]);
+            $incident->update(['last_notified_at' => now()]);
+        } catch (Throwable) {
+            // Alert delivery failure must never prevent the incident itself from being recorded.
+        }
     }
 
     private function sanitizeContext(array $context): array
