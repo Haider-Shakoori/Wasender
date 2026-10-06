@@ -23,7 +23,7 @@ final class WhatsAppSession extends Model
         'qr_generation_count', 'authenticated_at', 'ready_at', 'last_seen_at',
         'last_health_check_at', 'disconnected_at', 'disconnect_reason',
         'failure_code', 'failure_message', 'reconnect_attempts',
-        'last_reconnect_attempt_at', 'created_by', 'updated_by',
+        'last_reconnect_attempt_at', 'next_send_at', 'last_dispatch_reserved_at', 'created_by', 'updated_by',
     ];
 
     protected $hidden = ['storage_key'];
@@ -39,6 +39,8 @@ final class WhatsAppSession extends Model
             'last_health_check_at' => 'datetime',
             'disconnected_at' => 'datetime',
             'last_reconnect_attempt_at' => 'datetime',
+            'next_send_at' => 'datetime',
+            'last_dispatch_reserved_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
     }
