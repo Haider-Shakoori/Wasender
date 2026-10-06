@@ -176,7 +176,7 @@ jobs:
           sed -i 's|^WHATSAPP_CALLBACK_KEY=.*|WHATSAPP_CALLBACK_KEY=ci-callback-key|' .env
           sed -i 's|^WHATSAPP_HMAC_SECRET=.*|WHATSAPP_HMAC_SECRET=ci-hmac-secret|' whatsapp-service/.env
       - name: Validate shell scripts
-        run: bash -n deploy/scripts/preflight.sh docker/whatsapp/entrypoint.sh
+        run: bash -n deploy/scripts/preflight.sh deploy/scripts/backup.sh deploy/scripts/restore.sh deploy/scripts/upgrade.sh deploy/scripts/rollback-code.sh docker/whatsapp/entrypoint.sh
       - name: Validate Docker Compose
         run: docker compose -f compose.production.yml config --quiet
       - name: Build production images
