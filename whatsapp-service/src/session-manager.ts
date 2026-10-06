@@ -8,6 +8,7 @@ import type { Message } from 'whatsapp-web.js';
 import type { CallbackClient } from './callback-client.js';
 import type { Config } from './config.js';
 import { signature } from './security.js';
+import { canReclaimSessionLease, type SessionLease } from './session-lease.js';
 import type { CampaignSendInput, DirectSendInput, SessionInput, SessionRuntime } from './session-runtime.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
@@ -271,9 +272,10 @@ export class SessionManager implements SessionRuntime {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
         try {
-          const existing = JSON.parse(fs.readFileSync(leasePath, 'utf8')) as { expires_at?: number; host?: string; pid?: number };
-          const sameHostDeadProcess = existing.host === os.hostname() && Number.isInteger(existing.pid) && !this.processAlive(existing.pid!);
-          if (!sameHostDeadProcess && (existing.expires_at ?? 0) > Date.now()) throw new Error('session_owned_by_healthy_connector');
+          const existing = JSON.parse(fs.readFileSync(leasePath, 'utf8')) as SessionLease;
+          if (!canReclaimSessionLease(existing, this.instanceId, os.hostname(), (pid) => this.processAlive(pid))) {
+            throw new Error('session_owned_by_healthy_connector');
+          }
           fs.unlinkSync(leasePath);
         } catch (readError) {
           if (readError instanceof Error && readError.message === 'session_owned_by_healthy_connector') throw readError;
