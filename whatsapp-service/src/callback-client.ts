@@ -88,7 +88,11 @@ export class CallbackClient {
   private async flush(): Promise<void> {
     if (!this.outbox) return;
     for (const record of this.outbox.due().slice(0, 50)) {
-      await this.deliverRecord(record);
+      try {
+        await this.deliverRecord(record);
+      } catch {
+        // The record remains in the outbox with backoff for the next retry.
+      }
     }
   }
 
