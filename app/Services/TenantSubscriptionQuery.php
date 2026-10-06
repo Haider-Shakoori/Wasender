@@ -4,10 +4,11 @@ namespace App\Services;
 
 use App\Contracts\TenantContext;
 use App\Models\SubscriptionPlan;
+use App\Services\Billing\PaymentGatewayRegistry;
 
 final class TenantSubscriptionQuery
 {
-    public function __construct(private TenantContext $context, private SubscriptionUsageRegistry $usage) {}
+    public function __construct(private TenantContext $context, private SubscriptionUsageRegistry $usage, private PaymentGatewayRegistry $gateways) {}
 
     public function overview(): array
     {
@@ -25,6 +26,7 @@ final class TenantSubscriptionQuery
             'messageUsage' => $subscription ? $this->usage->summary($tenant, 'messages.monthly') : null,
             'payments' => $tenant->billingPayments()->latest('paid_at')->limit(10)->get(),
             'publicPlans' => SubscriptionPlan::with('features')->where('status', 'active')->where('is_public', true)->orderBy('sort_order')->get(),
+            'paymentGateways' => $this->gateways->enabled(),
         ];
     }
 }
