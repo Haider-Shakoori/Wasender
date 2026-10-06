@@ -44,6 +44,7 @@ export class SessionManager implements SessionRuntime {
       puppeteer: {
         headless: true,
         executablePath: this.config.chromiumPath,
+        protocolTimeout: this.config.chromiumProtocolTimeoutMs,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
       },
     });
@@ -94,6 +95,7 @@ export class SessionManager implements SessionRuntime {
         code: 'initialization_failed',
         message: error instanceof Error ? error.message.slice(0, 500) : 'WhatsApp initialization failed.',
       });
+      try { await client.destroy(); } catch { /* best-effort cleanup after failed initialization */ }
       this.runtimes.delete(input.session_uuid);
       this.releaseLease(runtime);
       throw error;
