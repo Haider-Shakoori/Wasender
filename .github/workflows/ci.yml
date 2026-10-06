@@ -179,3 +179,5 @@ jobs:
         run: bash -n deploy/scripts/preflight.sh docker/whatsapp/entrypoint.sh
       - name: Validate Docker Compose
         run: docker compose -f compose.production.yml config --quiet
+      - name: Build production images
+        run: docker compose -f compose.production.yml build app web whatsapp
