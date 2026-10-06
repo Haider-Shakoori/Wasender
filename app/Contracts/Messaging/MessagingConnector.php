@@ -25,6 +25,8 @@ interface MessagingConnector
 
     public function restart(string $sessionReference): ConnectorSessionResult;
 
+    public function disconnect(string $sessionReference): ConnectorSessionResult;
+
     public function logout(string $sessionReference): ConnectorSessionResult;
 
     public function delete(string $sessionReference): void;

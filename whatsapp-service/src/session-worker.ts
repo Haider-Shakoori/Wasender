@@ -55,6 +55,12 @@ async function handle(message: WorkerRequest): Promise<void> {
         result = runtime.status(payload.uuid);
         break;
       }
+      case 'disconnect': {
+        const uuid = String(message.payload ?? '');
+        await runtime.disconnect(uuid);
+        result = true;
+        break;
+      }
       case 'logout': {
         const uuid = String(message.payload ?? '');
         await runtime.logout(uuid);

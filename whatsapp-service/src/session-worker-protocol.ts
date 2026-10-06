@@ -1,6 +1,7 @@
 export type WorkerAction =
   | 'initialize'
   | 'restart'
+  | 'disconnect'
   | 'logout'
   | 'remove'
   | 'heartbeat'

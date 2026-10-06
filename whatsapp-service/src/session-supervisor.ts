@@ -76,6 +76,19 @@ export class SessionSupervisor implements SessionRuntime {
     await this.initialize(input);
   }
 
+  async disconnect(uuid: string): Promise<void> {
+    this.cancelRestart(uuid);
+    const record = this.workers.get(uuid);
+    if (!record) return;
+
+    record.intentionalShutdown = true;
+    try {
+      await this.request(record, 'disconnect', uuid);
+    } finally {
+      await this.stop(record);
+    }
+  }
+
   async logout(uuid: string): Promise<void> {
     this.cancelRestart(uuid);
     const record = this.workers.get(uuid);

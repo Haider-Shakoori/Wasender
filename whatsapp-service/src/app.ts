@@ -53,7 +53,7 @@ export function createApp(config: Config, sessions: SessionRuntime, campaigns?: 
   }));
   app.post('/internal/sessions/:uuid/disconnect', asyncRoute(async (request, response) => {
     const uuid = String(request.params.uuid);
-    await sessions.logout(uuid); response.status(202).json({ reference: uuid, status: 'disconnected' });
+    await sessions.disconnect(uuid); response.status(202).json({ reference: uuid, status: 'disconnected' });
   }));
   app.delete('/internal/sessions/:uuid', asyncRoute(async (request, response) => {
     const uuid = String(request.params.uuid);
