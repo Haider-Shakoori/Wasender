@@ -8,12 +8,12 @@ import type { Message } from 'whatsapp-web.js';
 import type { CallbackClient } from './callback-client.js';
 import type { Config } from './config.js';
 import { signature } from './security.js';
+import type { CampaignSendInput, DirectSendInput, SessionInput, SessionRuntime } from './session-runtime.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
-type SessionInput = { session_uuid: string; storage_key: string; tenant_uuid?: string };
 type Runtime = { client: InstanceType<typeof Client>; state: string; reconnects: number; storageKey: string; tenantUuid?: string; inFlight: number; leasePath: string };
 
-export class SessionManager {
+export class SessionManager implements SessionRuntime {
   private readonly runtimes = new Map<string, Runtime>();
   private readonly sent = new Map<string, { messageUuid?: string; requestId?: string; campaignKey?: string; ack: number }>();
   private readonly instanceId: string;
@@ -150,7 +150,7 @@ export class SessionManager {
     return { instance_id: this.instanceId, owned_sessions: this.runtimes.size, ready_sessions: [...this.runtimes.values()].filter((runtime) => runtime.state === 'ready').length };
   }
 
-  async send(input: { message_uuid: string; session_uuid: string; request_id: string; recipient: string; type: string; body?: string | null; media?: { url: string; mime_type: string; filename: string; size: number; checksum_sha256: string } | null; expires_at?: string | null }): Promise<{ accepted: boolean; whatsapp_message_id: string }> {
+  async send(input: DirectSendInput): Promise<{ accepted: boolean; whatsapp_message_id: string }> {
     if (!/^[0-9a-f-]{36}$/i.test(input.message_uuid) || !/^[0-9a-f-]{36}$/i.test(input.request_id) || !/^[1-9][0-9]{7,14}$/.test(input.recipient)) throw new Error('invalid_message_request');
     if (input.expires_at && Date.parse(input.expires_at) <= Date.now()) throw new Error('message_expired');
     if (!['text', 'image', 'document', 'audio', 'video'].includes(input.type)) throw new Error('unsupported_message_type');
@@ -175,11 +175,7 @@ export class SessionManager {
     this.campaignAcknowledgement = listener;
   }
 
-  async sendCampaign(input: {
-    tenantUuid: string; sessionUuid: string; recipientAddress: string; type: string; body: string | null;
-    attachment: { retrieval_url: string; retrieval_token: string; mime_type: string; original_name: string; size_bytes: number; checksum_sha256: string } | null;
-    campaignKey: string;
-  }): Promise<string> {
+  async sendCampaign(input: CampaignSendInput): Promise<string> {
     const runtime = this.runtimes.get(input.sessionUuid);
     if (!runtime) throw new Error('session_not_found');
     if (!runtime.tenantUuid || runtime.tenantUuid !== input.tenantUuid) throw new Error('session_tenant_mismatch');

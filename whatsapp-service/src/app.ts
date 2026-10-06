@@ -2,12 +2,12 @@ import express from 'express';
 import helmet from 'helmet';
 import type { Config } from './config.js';
 import { NonceStore, verifySignature } from './security.js';
-import type { SessionManager } from './session-manager.js';
+import type { SessionRuntime } from './session-runtime.js';
 import { RequestRegistry } from './request-registry.js';
 import type { CampaignService } from './campaign-service.js';
 import { uuidPattern } from './campaign-types.js';
 
-export function createApp(config: Config, sessions: SessionManager, campaigns?: CampaignService, isDraining: () => boolean = () => false) {
+export function createApp(config: Config, sessions: SessionRuntime, campaigns?: CampaignService, isDraining: () => boolean = () => false) {
   const app = express();
   app.disable('x-powered-by');
   app.use(helmet());

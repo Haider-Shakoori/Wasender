@@ -4,12 +4,12 @@ import type { Config } from './config.js';
 import { CampaignStore } from './campaign-store.js';
 import type { CampaignDispatch, CampaignDispatchResult, CampaignFailure } from './campaign-types.js';
 import { validateCampaignDispatch } from './campaign-types.js';
-import type { SessionManager } from './session-manager.js';
+import type { SessionRuntime } from './session-runtime.js';
 
 export class CampaignService {
   readonly store: CampaignStore;
   private callbackTimer?: NodeJS.Timeout;
-  constructor(private readonly config: Config, private readonly sessions: SessionManager, private readonly callbacks: CallbackClient) {
+  constructor(private readonly config: Config, private readonly sessions: SessionRuntime, private readonly callbacks: CallbackClient) {
     this.store = new CampaignStore(config.campaign.storePath, config.campaign.idempotencyTtlMs);
     sessions.onCampaignAcknowledgement((key, id, ack) => this.acknowledge(key, id, ack));
     this.callbackTimer = setInterval(() => void this.flushOutbox(), 2_000); this.callbackTimer.unref();
