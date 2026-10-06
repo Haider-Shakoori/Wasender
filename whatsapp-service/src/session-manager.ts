@@ -7,12 +7,13 @@ import pkg from 'whatsapp-web.js';
 import type { Message } from 'whatsapp-web.js';
 import type { CallbackClient } from './callback-client.js';
 import type { Config } from './config.js';
+import { WHATSAPP_READY_RECOVERY_DELAYS_MS, shouldRetryReadyInjection, type WhatsAppReadinessProbe } from './readiness-recovery.js';
 import { signature } from './security.js';
 import { canReclaimSessionLease, type SessionLease } from './session-lease.js';
 import type { CampaignSendInput, DirectSendInput, SessionInput, SessionRuntime } from './session-runtime.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
-type Runtime = { client: InstanceType<typeof Client>; state: string; reconnects: number; storageKey: string; tenantUuid?: string; inFlight: number; leasePath: string };
+type Runtime = { client: InstanceType<typeof Client>; state: string; reconnects: number; storageKey: string; tenantUuid?: string; inFlight: number; leasePath: string; readyRecoveryRunning: boolean };
 
 export class SessionManager implements SessionRuntime {
   private readonly runtimes = new Map<string, Runtime>();
@@ -51,14 +52,18 @@ export class SessionManager implements SessionRuntime {
       },
     });
     if (input.tenant_uuid && !/^[0-9a-f-]{36}$/i.test(input.tenant_uuid)) throw new Error('invalid_tenant_identity');
-    const runtime: Runtime = { client, state: 'initializing', reconnects: 0, storageKey: input.storage_key, tenantUuid: input.tenant_uuid, inFlight: 0, leasePath };
+    const runtime: Runtime = { client, state: 'initializing', reconnects: 0, storageKey: input.storage_key, tenantUuid: input.tenant_uuid, inFlight: 0, leasePath, readyRecoveryRunning: false };
     this.runtimes.set(input.session_uuid, runtime);
     client.on('qr', async (qr) => {
       runtime.state = 'qr_pending';
       const png = await QRCode.toDataURL(qr, { errorCorrectionLevel: 'M', margin: 2, width: 320 });
       await this.safeEmit(input.session_uuid, 'qr', { qr: png });
     });
-    client.on('authenticated', () => { runtime.state = 'authenticated'; void this.safeEmit(input.session_uuid, 'authenticated'); });
+    client.on('authenticated', () => {
+      runtime.state = 'authenticated';
+      void this.safeEmit(input.session_uuid, 'authenticated');
+      void this.recoverReadyBridge(input.session_uuid, runtime);
+    });
     client.on('ready', () => {
       runtime.state = 'ready'; runtime.reconnects = 0;
       const info = client.info;
@@ -341,6 +346,58 @@ export class SessionManager implements SessionRuntime {
 
     for (const name of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
       try { fs.rmSync(path.join(profile, name), { force: true }); } catch { /* recreated by Chromium when needed */ }
+    }
+  }
+
+  private async recoverReadyBridge(uuid: string, runtime: Runtime): Promise<void> {
+    if (runtime.readyRecoveryRunning) return;
+    runtime.readyRecoveryRunning = true;
+
+    try {
+      for (const delayMs of WHATSAPP_READY_RECOVERY_DELAYS_MS) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+        if (this.runtimes.get(uuid) !== runtime || ['ready', 'failed', 'disconnected', 'lease_lost'].includes(runtime.state)) return;
+
+        const page = runtime.client.pupPage;
+        if (!page) continue;
+
+        const probe = await page.evaluate(() => {
+          const browserWindow = window as unknown as {
+            require?: (name: string) => { Socket?: { state?: string; hasSynced?: boolean } };
+            WWebJS?: unknown;
+          };
+          const socket = browserWindow.require?.('WAWebSocketModel')?.Socket;
+
+          return {
+            socketState: socket?.state ?? null,
+            hasSynced: socket?.hasSynced === true,
+            bridgeInjected: typeof browserWindow.WWebJS !== 'undefined',
+          };
+        }).catch(() => null) as WhatsAppReadinessProbe | null;
+
+        if (!probe || !shouldRetryReadyInjection(probe)) continue;
+
+        try {
+          const recoverableClient = runtime.client as InstanceType<typeof Client> & { inject: () => Promise<void> };
+          await recoverableClient.inject();
+        } catch (error) {
+          console.warn('WhatsApp ready bridge recovery attempt failed', {
+            session_uuid: uuid,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (this.runtimes.get(uuid) === runtime && runtime.state === 'authenticated') {
+        runtime.state = 'failed';
+        await this.safeEmit(uuid, 'auth_failure', {
+          code: 'ready_timeout',
+          message: 'WhatsApp Web authenticated but the client bridge did not become ready after recovery attempts.',
+        });
+      }
+    } finally {
+      runtime.readyRecoveryRunning = false;
     }
   }
 
