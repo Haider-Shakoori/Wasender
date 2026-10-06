@@ -28,7 +28,7 @@ final class PlatformDashboardQuery
                 'openIncidents' => PlatformIncident::query()->where('status', 'open')->count(),
             ],
             'recentEvents' => PlatformAuditLog::query()->with('actor:id,name,email')->latest('created_at')->limit(8)->get(),
-            'recentIncidents' => PlatformIncident::query()->latest('last_seen_at')->limit(5)->get(),
+            'recentIncidents' => PlatformIncident::query()->where('status', 'open')->latest('last_seen_at')->limit(5)->get(),
         ];
     }
 }
