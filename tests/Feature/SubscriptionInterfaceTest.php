@@ -49,7 +49,7 @@ final class SubscriptionInterfaceTest extends TestCase
         $role = app(RolePermissionService::class)->initializeForTenant($tenant)->get('owner');
         TenantMembership::factory()->for($tenant)->for($owner)->for($role)->create(['status' => MembershipStatus::Active, 'joined_at' => now()]);
         app(SubscriptionBootstrapService::class)->assignDefault($tenant);
-        $this->actingAs($owner)->withSession(['active_tenant_id' => $tenant->id])->get(route('tenant.subscription.show'))->assertOk()->assertSee('Trial')->assertSee('Active team members')->assertSee('Online checkout is not available')->assertDontSee('Pay now');
+        $this->actingAs($owner)->withSession(['active_tenant_id' => $tenant->id])->get(route('tenant.subscription.show'))->assertOk()->assertSee('Trial')->assertSee('Active team members')->assertSee('Contact platform admin for pricing')->assertDontSee('Pay now');
     }
 
     public function test_restricted_subscription_still_reaches_overview(): void
