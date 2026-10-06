@@ -16,6 +16,13 @@ export type Config = {
   chromiumPath?: string;
   callbackTimeoutMs: number;
   maxReconnectAttempts: number;
+  sessionWorkers: {
+    enabled: boolean;
+    requestTimeoutMs: number;
+    maxRestarts: number;
+    restartWindowMs: number;
+    restartBaseDelayMs: number;
+  };
   campaign: {
     enabled: boolean;
     storePath: string;
@@ -38,7 +45,11 @@ export function loadConfig(): Config {
   const callbackTimeoutMs = Number(process.env.CALLBACK_TIMEOUT_MS ?? 10000);
   const maxReconnectAttempts = Number(process.env.MAX_RECONNECT_ATTEMPTS ?? 5);
   const sessionLeaseTtlMs = Number(process.env.SESSION_LEASE_TTL_SECONDS ?? 180) * 1000;
-  if (![port, callbackTimeoutMs, maxReconnectAttempts, sessionLeaseTtlMs].every(Number.isFinite)) {
+  const workerRequestTimeoutMs = Number(process.env.SESSION_WORKER_REQUEST_TIMEOUT_MS ?? 90000);
+  const workerMaxRestarts = Number(process.env.SESSION_WORKER_MAX_RESTARTS ?? 5);
+  const workerRestartWindowMs = Number(process.env.SESSION_WORKER_RESTART_WINDOW_SECONDS ?? 600) * 1000;
+  const workerRestartBaseDelayMs = Number(process.env.SESSION_WORKER_RESTART_BASE_DELAY_MS ?? 2000);
+  if (![port, callbackTimeoutMs, maxReconnectAttempts, sessionLeaseTtlMs, workerRequestTimeoutMs, workerMaxRestarts, workerRestartWindowMs, workerRestartBaseDelayMs].every(Number.isFinite)) {
     throw new Error('Numeric connector configuration is invalid');
   }
 
@@ -52,6 +63,13 @@ export function loadConfig(): Config {
     chromiumPath: process.env.PUPPETEER_EXECUTABLE_PATH,
     callbackTimeoutMs,
     maxReconnectAttempts,
+    sessionWorkers: {
+      enabled: (process.env.SESSION_WORKERS_ENABLED ?? 'true') === 'true',
+      requestTimeoutMs: workerRequestTimeoutMs,
+      maxRestarts: workerMaxRestarts,
+      restartWindowMs: workerRestartWindowMs,
+      restartBaseDelayMs: workerRestartBaseDelayMs,
+    },
     campaign: {
       enabled: (process.env.CAMPAIGN_TRANSPORT_ENABLED ?? 'true') === 'true',
       storePath: path.resolve(process.env.CAMPAIGN_TRANSPORT_STORE_PATH ?? './storage/campaign-transport.json'),
