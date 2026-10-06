@@ -42,6 +42,7 @@ export interface SessionRuntime {
   initialize(input: SessionInput): Promise<void>;
   status(uuid: string): Record<string, unknown> | null;
   restart(uuid: string, fallback?: Pick<SessionInput, 'storage_key' | 'tenant_uuid'>): Promise<void>;
+  disconnect(uuid: string): Promise<void>;
   logout(uuid: string): Promise<void>;
   remove(input: SessionInput): Promise<void>;
   heartbeat(): Promise<void>;
