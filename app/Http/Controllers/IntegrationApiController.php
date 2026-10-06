@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\IntegrationEvent;
+use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppMessageTemplateVersion;
 use App\Services\Integrations\ProcessIntegrationMessageService;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,32 @@ final class IntegrationApiController extends Controller
         $integration->update(['last_success_at' => now(), 'last_failure_code' => null]);
 
         return response()->json(['message_uuid' => $message->uuid, 'status' => $message->status->value], 202);
+    }
+
+
+    public function showMessage(Request $request, string $integration, string $message): JsonResponse
+    {
+        $integrationModel = $request->attributes->get('integration_model');
+        $record = WhatsAppMessage::query()
+            ->where('tenant_id', $integrationModel->tenant_id)
+            ->where('uuid', $message)
+            ->where('metadata->source', 'integration')
+            ->where('metadata->integration_uuid', $integrationModel->uuid)
+            ->firstOrFail();
+
+        return response()->json([
+            'message_uuid' => $record->uuid,
+            'status' => $record->status->value,
+            'recipient' => $record->recipient_normalized,
+            'whatsapp_message_id' => $record->whatsapp_message_id,
+            'failure_code' => $record->failure_code,
+            'failure_retryable' => (bool) $record->failure_retryable,
+            'queued_at' => $record->queued_at?->toIso8601String(),
+            'sent_at' => $record->sent_at?->toIso8601String(),
+            'delivered_at' => $record->delivered_at?->toIso8601String(),
+            'read_at' => $record->read_at?->toIso8601String(),
+            'failed_at' => $record->failed_at?->toIso8601String(),
+        ]);
     }
 
     public function event(Request $request, ProcessIntegrationMessageService $service): JsonResponse
