@@ -35,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'whatsapp.signature' => VerifyWhatsAppConnectorSignature::class,
             'integration.auth' => AuthenticateIntegration::class,
         ]);
-        $middleware->validateCsrfTokens(except: ['internal/whatsapp/events', 'internal/whatsapp/inbox-events', 'internal/whatsapp/message-events', 'internal/whatsapp/campaign-events']);
+        $middleware->validateCsrfTokens(except: ['internal/whatsapp/events', 'internal/whatsapp/inbox-events', 'internal/whatsapp/message-events', 'internal/whatsapp/campaign-events', 'billing/webhooks/stripe']);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
