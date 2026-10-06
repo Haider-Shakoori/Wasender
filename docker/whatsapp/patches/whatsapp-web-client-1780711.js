@@ -104,6 +104,13 @@ class Client extends EventEmitter {
         this.currentIndexHtml = null;
         this.lastLoggedOut = false;
 
+        // WWebJS utilities can be present before the full client setup has
+        // completed. Track the Node-side readiness stages independently so a
+        // later inject() can safely resume ClientInfo/listener initialization.
+        this._authenticatedEventEmitted = false;
+        this._readyInitializationComplete = false;
+        this._readyInitializationPromise = null;
+
         Util.setFfmpegPath(this.options.ffmpegPath);
     }
 
@@ -290,80 +297,113 @@ class Client extends EventEmitter {
                 this.pupPage,
                 'onAppStateHasSyncedEvent',
                 async () => {
-                    const authEventPayload =
-                        await this.authStrategy.getAuthEventPayload();
-                    /**
-                     * Emitted when authentication is successful
-                     * @event Client#authenticated
-                     */
-                    this.emit(Events.AUTHENTICATED, authEventPayload);
+                    if (!this._authenticatedEventEmitted) {
+                        const authEventPayload =
+                            await this.authStrategy.getAuthEventPayload();
+                        // Mark before emitting because EventEmitter listeners run
+                        // synchronously and can trigger recovery immediately.
+                        this._authenticatedEventEmitted = true;
+                        /**
+                         * Emitted when authentication is successful
+                         * @event Client#authenticated
+                         */
+                        this.emit(Events.AUTHENTICATED, authEventPayload);
+                    }
 
-                    const injected = await this.pupPage.evaluate(async () => {
-                        return typeof window.WWebJS !== 'undefined';
-                    });
+                    if (this._readyInitializationComplete) return;
 
-                    if (!injected) {
-                        if (
-                            this.options.webVersionCache.type === 'local' &&
-                            this.currentIndexHtml
-                        ) {
-                            const { type: webCacheType, ...webCacheOptions } =
-                                this.options.webVersionCache;
-                            const webCache = WebCacheFactory.createWebCache(
-                                webCacheType,
-                                webCacheOptions,
-                            );
-
-                            await webCache.persist(
-                                this.currentIndexHtml,
-                                version,
-                            );
-                        }
-
-                        // Load util functions (serializers, helper functions)
-                        await this.pupPage.evaluate(LoadUtils);
-
-                        await this.pupPage
-                            .waitForFunction(
-                                'typeof window.WWebJS !== "undefined"',
-                                { timeout: 30000 },
-                            )
-                            .catch(() => {
-                                throw 'ready timeout';
+                    // Multiple hasSynced notifications/recovery injects can race.
+                    // Share one resumable setup promise instead of initializing
+                    // ClientInfo and browser listeners concurrently.
+                    if (!this._readyInitializationPromise) {
+                        this._readyInitializationPromise = (async () => {
+                            const injected = await this.pupPage.evaluate(async () => {
+                                return typeof window.WWebJS !== 'undefined';
                             });
 
-                        /**
-                         * Current connection information
-                         * @type {ClientInfo}
-                         */
-                        this.info = new ClientInfo(
-                            this,
-                            await this.pupPage.evaluate(() => {
-                                return {
-                                    ...window
-                                        .require('WAWebConnModel')
-                                        .Conn.serialize(),
-                                    wid:
-                                        window
-                                            .require('WAWebUserPrefsMeUser')
-                                            .getMaybeMePnUser() ||
-                                        window
-                                            .require('WAWebUserPrefsMeUser')
-                                            .getMaybeMeLidUser(),
-                                };
-                            }),
-                        );
+                            if (!injected) {
+                                if (
+                                    this.options.webVersionCache.type === 'local' &&
+                                    this.currentIndexHtml
+                                ) {
+                                    const { type: webCacheType, ...webCacheOptions } =
+                                        this.options.webVersionCache;
+                                    const webCache = WebCacheFactory.createWebCache(
+                                        webCacheType,
+                                        webCacheOptions,
+                                    );
 
-                        this.interface = new InterfaceController(this);
+                                    await webCache.persist(
+                                        this.currentIndexHtml,
+                                        version,
+                                    );
+                                }
 
-                        await this.attachEventListeners();
+                                // Load util functions (serializers, helper functions).
+                                // Their presence alone does not mean the client is ready.
+                                await this.pupPage.evaluate(LoadUtils);
+
+                                await this.pupPage
+                                    .waitForFunction(
+                                        'typeof window.WWebJS !== "undefined"',
+                                        { timeout: 30000 },
+                                    )
+                                    .catch(() => {
+                                        throw 'ready timeout';
+                                    });
+                            }
+
+                            /**
+                             * Current connection information
+                             * @type {ClientInfo}
+                             */
+                            this.info = new ClientInfo(
+                                this,
+                                await this.pupPage.evaluate(() => {
+                                    return {
+                                        ...window
+                                            .require('WAWebConnModel')
+                                            .Conn.serialize(),
+                                        wid:
+                                            window
+                                                .require('WAWebUserPrefsMeUser')
+                                                .getMaybeMePnUser() ||
+                                            window
+                                                .require('WAWebUserPrefsMeUser')
+                                                .getMaybeMeLidUser(),
+                                    };
+                                }),
+                            );
+
+                            this.interface = new InterfaceController(this);
+                            await this.attachEventListeners();
+                            this._readyInitializationComplete = true;
+
+                            /**
+                             * Emitted when the client has initialized and is ready to receive messages.
+                             * @event Client#ready
+                             */
+                            this.emit(Events.READY);
+                            this.authStrategy.afterAuthReady();
+                        })();
                     }
-                    /**
-                     * Emitted when the client has initialized and is ready to receive messages.
-                     * @event Client#ready
-                     */
-                    this.emit(Events.READY);
-                    this.authStrategy.afterAuthReady();
+
+                    try {
+                        await this._readyInitializationPromise;
+                    } catch (err) {
+                        // Keep the setup retryable. A common failure mode is
+                        // LoadUtils succeeding while a later WhatsApp module is
+                        // temporarily unavailable during post-auth hydration.
+                        console.warn(
+                            'WhatsApp ready initialization incomplete; will retry',
+                            err,
+                        );
+                        throw err;
+                    } finally {
+                        if (!this._readyInitializationComplete) {
+                            this._readyInitializationPromise = null;
+                        }
+                    }
                 },
             );
             let lastPercent = null;
