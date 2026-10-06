@@ -2,6 +2,7 @@ import path from 'node:path';
 import { CallbackClient } from './callback-client.js';
 import { loadConfig } from './config.js';
 import { SessionManager } from './session-manager.js';
+import { isTransientBrowserNavigationRejection } from './session-worker-errors.js';
 import type { CampaignSendInput, DirectSendInput, SessionInput } from './session-runtime.js';
 import type { WorkerMessage, WorkerRequest, WorkerResponse } from './session-worker-protocol.js';
 
@@ -122,8 +123,12 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('session worker unhandled rejection', {
-    message: reason instanceof Error ? reason.message : String(reason),
-  });
+  const message = reason instanceof Error ? reason.message : String(reason);
+  if (isTransientBrowserNavigationRejection(reason)) {
+    console.warn('session worker ignored transient browser navigation rejection', { message });
+    return;
+  }
+
+  console.error('session worker unhandled rejection', { message });
   process.exit(1);
 });
