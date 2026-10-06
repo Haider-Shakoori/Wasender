@@ -44,7 +44,8 @@ final class CreateTransactionalWhatsAppMessageFromTemplateService
         $body = $rendered->type->value === 'text' ? $rendered->body : $rendered->caption;
 
         return DB::transaction(function () use ($tenant, $actor, $data, $version, $rendered, $body, $requestHash): WhatsAppMessage {
-            $message = $this->messages->create($tenant, $actor, ['session_uuid' => $data['session_uuid'], 'recipient' => $data['recipient'], 'message_type' => $rendered->type->value, 'body' => $body, 'idempotency_key' => $data['idempotency_key'], 'metadata' => ['template_request_hash' => $requestHash]], null, $version, $rendered);
+            $metadata = array_merge((array) ($data['metadata'] ?? []), ['template_request_hash' => $requestHash]);
+            $message = $this->messages->create($tenant, $actor, ['session_uuid' => $data['session_uuid'], 'recipient' => $data['recipient'], 'message_type' => $rendered->type->value, 'body' => $body, 'idempotency_key' => $data['idempotency_key'], 'metadata' => $metadata], null, $version, $rendered);
             $this->usages->record($version, 'transactional', $message->uuid);
 
             return $message;

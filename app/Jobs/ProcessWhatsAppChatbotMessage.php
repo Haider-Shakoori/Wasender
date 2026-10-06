@@ -19,7 +19,10 @@ final class ProcessWhatsAppChatbotMessage implements ShouldQueue
 
     public int $timeout = 30;
 
-    public function __construct(public int $messageId) {}
+    public function __construct(public int $messageId)
+    {
+        $this->onQueue(config('chatbots.queue'));
+    }
 
     public function handle(TenantContext $context, ProcessWhatsAppChatbotMessageService $processor): void
     {

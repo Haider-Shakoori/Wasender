@@ -50,11 +50,32 @@ final class SendWhatsAppTemplateAutomationActionHandler implements AutomationAct
             }$resolved = [];
             foreach ($p['variable_mappings'] ?? [] as $key => $mapping) {
                 $resolved[$key] = $this->values->resolve($mapping, $contact, $context->context);
-            }$session = ($p['session_strategy'] ?? 'automatic') === 'specific' ? WhatsAppSession::forTenant($e->tenant_id)->where('uuid', $p['session_uuid'])->where('status', WhatsAppSessionStatus::Ready)->first() : WhatsAppSession::forTenant($e->tenant_id)->where('status', WhatsAppSessionStatus::Ready)->orderBy('id')->first();
+            }$session = ($p['session_strategy'] ?? 'automatic') === 'specific'
+                ? WhatsAppSession::forTenant($e->tenant_id)->where('uuid', $p['session_uuid'])->where('status', WhatsAppSessionStatus::Ready)->first()
+                : WhatsAppSession::forTenant($e->tenant_id)
+                    ->where('status', WhatsAppSessionStatus::Ready)
+                    ->orderByRaw('CASE WHEN next_send_at IS NULL THEN 0 ELSE 1 END')
+                    ->orderBy('next_send_at')
+                    ->orderBy('id')
+                    ->first();
             if (! $session) {
                 return $this->fail('temporary_internal_failure', true);
             }$key = hash('sha256', implode('|', [$e->uuid, $context->stepExecutionUuid, $context->stepKey, $context->attemptNumber, $version->uuid, $version->content_hash, $contact->uuid]));
-            $message = $this->messages->create($e->tenant, $actor, ['session_uuid' => $session->uuid, 'recipient' => $contact->phone_normalized, 'template_uuid' => $p['template_uuid'], 'template_version_uuid' => $version->uuid, 'values' => $resolved, 'timezone' => $contact->timezone ?: 'UTC', 'idempotency_key' => $key]);
+            $message = $this->messages->create($e->tenant, $actor, [
+                'session_uuid' => $session->uuid,
+                'recipient' => $contact->phone_normalized,
+                'template_uuid' => $p['template_uuid'],
+                'template_version_uuid' => $version->uuid,
+                'values' => $resolved,
+                'timezone' => $contact->timezone ?: 'UTC',
+                'idempotency_key' => $key,
+                'metadata' => [
+                    'source' => 'automation',
+                    'workflow_uuid' => $e->workflow->uuid,
+                    'workflow_execution_uuid' => $e->uuid,
+                    'workflow_step_key' => $context->stepKey,
+                ],
+            ]);
             $output = ['message_uuid' => $message->uuid, 'message_status' => $message->status->value, 'template_uuid' => $p['template_uuid'], 'template_version_uuid' => $version->uuid];
             $this->audit->recordDomain('automation_workflow.message_queued', $actor, $e->tenant, $e, ['workflow_uuid' => $e->workflow->uuid, 'execution_uuid' => $e->uuid, 'step_key' => $context->stepKey, 'action_type' => 'send_whatsapp_template', 'contact_uuid' => $contact->uuid, 'message_uuid' => $message->uuid]);
 
