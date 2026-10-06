@@ -19,7 +19,6 @@ final class TenantDashboardController extends Controller
         return view('tenant.dashboard', [
             'tenant' => $context->get(),
             'membership' => $membership,
-            'memberCount' => $context->get()->memberships()->active()->count(),
             ...$dashboard->summary(),
         ]);
     }
