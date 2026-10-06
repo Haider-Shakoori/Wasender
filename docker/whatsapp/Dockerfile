@@ -11,6 +11,8 @@ RUN apt-get update \
 
 WORKDIR /app
 
+ENV PUPPETEER_CACHE_DIR=/opt/puppeteer
+
 COPY whatsapp-service/package.json whatsapp-service/package-lock.json ./
 RUN npm ci
 
@@ -24,7 +26,7 @@ COPY docker/whatsapp/entrypoint.sh /usr/local/bin/wasender-whatsapp-entrypoint
 RUN chmod +x /usr/local/bin/wasender-whatsapp-entrypoint
 
 ENV NODE_ENV=production
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_CACHE_DIR=/opt/puppeteer
 ENV HOME=/var/lib/wasender
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--", "/usr/local/bin/wasender-whatsapp-entrypoint"]
