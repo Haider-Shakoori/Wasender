@@ -38,6 +38,7 @@ export class SessionManager implements SessionRuntime {
     this.validate(input);
     if (this.runtimes.has(input.session_uuid)) return;
     const leasePath = this.acquireLease(input.session_uuid);
+    this.clearStaleChromiumProfileLocks(input.storage_key);
     const client = new Client({
       authStrategy: new LocalAuth({ clientId: input.storage_key, dataPath: this.config.authRoot }),
       puppeteer: {
@@ -308,6 +309,34 @@ export class SessionManager implements SessionRuntime {
       const lease = JSON.parse(fs.readFileSync(runtime.leasePath, 'utf8')) as { owner?: string };
       if (lease.owner === this.instanceId) fs.unlinkSync(runtime.leasePath);
     } catch { /* an expired or replaced lease is not ours to remove */ }
+  }
+
+  private clearStaleChromiumProfileLocks(storageKey: string): void {
+    const profile = path.resolve(this.config.authRoot, `session-${storageKey}`);
+    if (!profile.startsWith(`${this.config.authRoot}${path.sep}`) || !fs.existsSync(profile)) return;
+
+    // Lease ownership guarantees no healthy session worker should currently own this
+    // profile. Any Chromium still referencing it is therefore an orphan from a
+    // crashed/replaced worker and must be terminated before LocalAuth can reopen it.
+    if (process.platform === 'linux' && fs.existsSync('/proc')) {
+      for (const entry of fs.readdirSync('/proc')) {
+        if (!/^\d+$/.test(entry)) continue;
+        const pid = Number(entry);
+        if (pid === process.pid) continue;
+        try {
+          const command = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ');
+          if (command.includes(profile) && /(chromium|chrome)/i.test(command)) {
+            process.kill(pid, 'SIGKILL');
+          }
+        } catch {
+          // Processes may exit between directory enumeration and inspection.
+        }
+      }
+    }
+
+    for (const name of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+      try { fs.rmSync(path.join(profile, name), { force: true }); } catch { /* recreated by Chromium when needed */ }
+    }
   }
 
   private async safeEmit(uuid: string, event: string, payload: Record<string, unknown> = {}): Promise<void> {
