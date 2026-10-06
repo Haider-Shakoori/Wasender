@@ -48,9 +48,14 @@ final class WhatsAppConnectorClient implements MessagingConnector
         return $this->request('POST', "/internal/sessions/{$sessionReference}/reconnect", ['storage_key' => $session->storage_key, 'tenant_uuid' => $session->tenant->uuid]);
     }
 
-    public function logout(string $sessionReference): ConnectorSessionResult
+    public function disconnect(string $sessionReference): ConnectorSessionResult
     {
         return $this->request('POST', "/internal/sessions/{$sessionReference}/disconnect");
+    }
+
+    public function logout(string $sessionReference): ConnectorSessionResult
+    {
+        return $this->request('POST', "/internal/sessions/{$sessionReference}/logout");
     }
 
     public function delete(string $sessionReference): void
