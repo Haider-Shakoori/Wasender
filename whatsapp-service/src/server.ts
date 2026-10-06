@@ -2,11 +2,14 @@ import { createApp } from './app.js';
 import { CallbackClient } from './callback-client.js';
 import { loadConfig } from './config.js';
 import { SessionManager } from './session-manager.js';
+import { SessionSupervisor } from './session-supervisor.js';
 import { CampaignService } from './campaign-service.js';
 
 const config = loadConfig();
-const sessions = new SessionManager(config, new CallbackClient(config.callbackUrl, config.hmacSecret, config.callbackTimeoutMs));
 const callbacks = new CallbackClient(config.callbackUrl, config.hmacSecret, config.callbackTimeoutMs);
+const sessions = config.sessionWorkers.enabled
+  ? new SessionSupervisor(config, callbacks)
+  : new SessionManager(config, callbacks);
 const campaigns = new CampaignService(config, sessions, callbacks);
 let draining = false;
 const server = createApp(config, sessions, campaigns, () => draining).listen(config.port, () => console.log(`WhatsApp connector listening on ${config.port}`));
