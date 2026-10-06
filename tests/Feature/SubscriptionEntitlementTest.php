@@ -69,11 +69,11 @@ final class SubscriptionEntitlementTest extends TestCase
         $entitlements = app(TenantEntitlements::class);
         $this->assertTrue($entitlements->hasFeature('team.manage'));
         $this->assertFalse($entitlements->hasFeature('webhooks.manage'));
-        $this->assertSame(5, $entitlements->limit('team_members.max')->value);
+        $this->assertSame(2, $entitlements->limit('team_members.max')->value);
         $this->assertSame(1, $entitlements->usage('team_members.max'));
-        $this->assertSame(4, $entitlements->remaining('team_members.max'));
-        $this->assertTrue($entitlements->canConsume('team_members.max', 4));
-        $this->assertFalse($entitlements->canConsume('team_members.max', 5));
+        $this->assertSame(1, $entitlements->remaining('team_members.max'));
+        $this->assertTrue($entitlements->canConsume('team_members.max', 1));
+        $this->assertFalse($entitlements->canConsume('team_members.max', 2));
     }
 
     public function test_missing_features_and_capacity_fail_safely(): void
