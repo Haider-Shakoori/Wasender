@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('tenant-invitations:expire')->hourly()->withoutOverlapping();
 Schedule::command('system:heartbeat')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('operations:detect-incidents')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('subscriptions:normalize')->hourly()->withoutOverlapping();
 Schedule::command('subscriptions:snapshot-usage')->dailyAt('00:10')->withoutOverlapping();
 Schedule::command('whatsapp-sessions:health')->everyMinute()->withoutOverlapping()->onOneServer();
