@@ -51,12 +51,22 @@ final class SystemHealthService
         $connectorOnline = ($remote['status'] ?? 'unavailable') === 'ok';
         $crashLoops = (int) ($remote['crash_loop_sessions'] ?? 0);
         $reconnecting = (int) ($remote['reconnecting_sessions'] ?? 0);
-        $connectorHealthy = $connectorOnline && $crashLoops === 0;
+        $capacityUsed = (int) ($remote['worker_capacity_used_percent'] ?? 0);
+        $diskCritical = (bool) ($remote['auth_disk_critical'] ?? false);
+        $callbackBacklog = (int) ($remote['callback_backlog'] ?? 0);
+        $connectorHealthy = $connectorOnline && $crashLoops === 0 && ! $diskCritical;
+
+        $connectorMessage = match (true) {
+            ! $connectorOnline => 'WhatsApp connector is unavailable.',
+            $diskCritical => 'WhatsApp connector auth storage is critically low on free disk space.',
+            $crashLoops > 0 => "WhatsApp connector is online but {$crashLoops} session worker(s) are in a crash loop.",
+            $capacityUsed >= 90 => "WhatsApp connector is healthy but worker capacity is at {$capacityUsed}%.",
+            default => 'WhatsApp connector is online.',
+        };
+
         $checks['whatsapp_connector'] = $this->result(
             $connectorHealthy,
-            $connectorOnline
-                ? ($crashLoops > 0 ? "WhatsApp connector is online but {$crashLoops} session worker(s) are in a crash loop." : 'WhatsApp connector is online.')
-                : 'WhatsApp connector is unavailable.',
+            $connectorMessage,
             [
                 'isolation' => $remote['isolation'] ?? null,
                 'owned_sessions' => (int) ($remote['owned_sessions'] ?? 0),
@@ -65,7 +75,33 @@ final class SystemHealthService
                 'crash_loop_sessions' => $crashLoops,
                 'uptime_seconds' => $remote['uptime_seconds'] ?? null,
                 'memory_rss_mb' => $remote['memory_rss_mb'] ?? null,
+                'worker_capacity' => (int) ($remote['worker_capacity'] ?? 0),
+                'worker_capacity_remaining' => (int) ($remote['worker_capacity_remaining'] ?? 0),
+                'worker_capacity_used_percent' => $capacityUsed,
+                'auth_disk_used_percent' => $remote['auth_disk_used_percent'] ?? null,
+                'auth_disk_free_mb' => $remote['auth_disk_free_mb'] ?? null,
+                'auth_disk_critical' => $diskCritical,
+                'callback_backlog' => $callbackBacklog,
             ],
+        );
+
+        $checks['whatsapp_capacity'] = $this->result(
+            $capacityUsed < 95,
+            $capacityUsed >= 95
+                ? "WhatsApp worker capacity is critically high at {$capacityUsed}%."
+                : "WhatsApp worker capacity is {$capacityUsed}% utilized.",
+            [
+                'worker_capacity_used_percent' => $capacityUsed,
+                'worker_capacity_remaining' => (int) ($remote['worker_capacity_remaining'] ?? 0),
+            ],
+        );
+
+        $checks['whatsapp_callback_backlog'] = $this->result(
+            $callbackBacklog < 100,
+            $callbackBacklog >= 100
+                ? "WhatsApp callback backlog has grown to {$callbackBacklog} events."
+                : "WhatsApp callback backlog is {$callbackBacklog}.",
+            ['callback_backlog' => $callbackBacklog],
         );
 
         return $checks;
