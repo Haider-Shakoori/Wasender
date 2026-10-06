@@ -4,6 +4,7 @@ namespace App\Services\Billing;
 
 use App\Enums\TenantSubscriptionStatus;
 use App\Models\BillingPayment;
+use App\Models\SubscriptionPlan;
 use App\Models\TenantSubscription;
 use App\Services\SubscriptionLifecycleService;
 use Illuminate\Support\Facades\DB;
@@ -33,10 +34,21 @@ final class StripeWebhookProcessor
             return;
         }
 
-        TenantSubscription::query()->where('uuid', $uuid)->update([
+        $planUuid = (string) data_get($object, 'metadata.target_plan_uuid', '');
+        $plan = $planUuid !== ''
+            ? SubscriptionPlan::query()->where('uuid', $planUuid)->where('status', 'active')->first()
+            : null;
+
+        $changes = [
             'provider' => 'stripe',
             'provider_subscription_id' => $object['subscription'] ?? null,
-        ]);
+        ];
+
+        if ($plan) {
+            $changes['plan_id'] = $plan->id;
+        }
+
+        TenantSubscription::query()->where('uuid', $uuid)->update($changes);
     }
 
     private function invoicePaid(string $eventId, array $object): void
