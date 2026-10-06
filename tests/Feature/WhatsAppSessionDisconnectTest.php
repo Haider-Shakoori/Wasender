@@ -9,6 +9,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Models\WhatsAppSession;
 use App\Services\WhatsAppSessionLifecycleService;
+use App\Services\WhatsAppSessionRuntimeEligibility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -34,7 +35,11 @@ final class WhatsAppSessionDisconnectTest extends TestCase
         $connector->shouldNotReceive('logout');
 
         (new ManageWhatsAppSession($session->id, 'disconnect'))
-            ->handle($connector, app(WhatsAppSessionLifecycleService::class));
+            ->handle(
+                $connector,
+                app(WhatsAppSessionLifecycleService::class),
+                app(WhatsAppSessionRuntimeEligibility::class),
+            );
 
         $this->assertSame(WhatsAppSessionStatus::Disconnected, $session->refresh()->status);
         $this->assertSame('manual_disconnect', $session->events()->latest('id')->firstOrFail()->reason_code);

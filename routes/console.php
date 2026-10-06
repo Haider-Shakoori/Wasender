@@ -15,6 +15,7 @@ Schedule::command('subscriptions:normalize')->hourly()->withoutOverlapping();
 Schedule::command('subscriptions:snapshot-usage')->dailyAt('00:10')->withoutOverlapping();
 Schedule::command('whatsapp-sessions:health')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('whatsapp-sessions:restore --limit=200')->everyMinute()->withoutOverlapping()->onOneServer();
+Schedule::command('whatsapp-sessions:enforce-entitlements --limit=500')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('whatsapp-messages:expire')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('whatsapp-campaigns:prepare-due')->everyMinute()->withoutOverlapping()->onOneServer();
 Schedule::command('whatsapp-campaigns:reconcile-preparations')->everyTenMinutes()->withoutOverlapping()->onOneServer();

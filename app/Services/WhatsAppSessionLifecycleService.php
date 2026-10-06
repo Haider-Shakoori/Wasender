@@ -12,8 +12,8 @@ use Illuminate\Validation\ValidationException;
 final class WhatsAppSessionLifecycleService
 {
     private const ALLOWED = [
-        'creating' => ['initializing', 'failed'],
-        'initializing' => ['qr_pending', 'authenticated', 'ready', 'failed'],
+        'creating' => ['initializing', 'disconnected', 'failed'],
+        'initializing' => ['qr_pending', 'authenticated', 'ready', 'disconnected', 'failed'],
         'qr_pending' => ['authenticating', 'failed', 'disconnected'],
         'authenticating' => ['authenticated', 'ready', 'failed', 'disconnected'],
         'authenticated' => ['ready', 'failed', 'disconnected'],
