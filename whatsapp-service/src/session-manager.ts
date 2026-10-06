@@ -358,6 +358,7 @@ export class SessionManager implements SessionRuntime {
     let media: Record<string, unknown> | null = null;
     if (message.hasMedia) {
       const downloaded = await message.downloadMedia();
+      if (!downloaded) return;
       const bytes = Buffer.from(downloaded.data, 'base64');
       if (bytes.length < 1 || bytes.length > 16 * 1024 * 1024) return;
       media = { mime_type: downloaded.mimetype, size_bytes: bytes.length, checksum_sha256: crypto.createHash('sha256').update(bytes).digest('hex'), retrieval_reference: this.stableEventId(`${input.session_uuid}:media:${serializedId}`) };
