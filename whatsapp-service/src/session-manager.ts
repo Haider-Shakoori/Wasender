@@ -40,11 +40,12 @@ export class SessionManager implements SessionRuntime {
     const leasePath = this.acquireLease(input.session_uuid);
     this.clearStaleChromiumProfileLocks(input.storage_key);
     const client = new Client({
+      authTimeoutMs: this.config.whatsappAuthTimeoutMs ?? 180_000,
       authStrategy: new LocalAuth({ clientId: input.storage_key, dataPath: this.config.authRoot }),
       puppeteer: {
         headless: true,
         executablePath: this.config.chromiumPath,
-        protocolTimeout: this.config.chromiumProtocolTimeoutMs ?? 180_000,
+        protocolTimeout: this.config.chromiumProtocolTimeoutMs ?? 300_000,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
       },
     });
