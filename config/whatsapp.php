@@ -10,4 +10,6 @@ return [
     'max_reconnect_attempts' => (int) env('WHATSAPP_MAX_RECONNECT_ATTEMPTS', 5),
     'stale_after_seconds' => (int) env('WHATSAPP_STALE_AFTER', 120),
     'queue' => env('WHATSAPP_QUEUE', 'whatsapp-sessions'),
+    'recovery_batch_size' => (int) env('WHATSAPP_RECOVERY_BATCH_SIZE', 200),
+    'recovery_stagger_seconds' => (int) env('WHATSAPP_RECOVERY_STAGGER_SECONDS', 2),
 ];
