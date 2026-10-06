@@ -6,6 +6,7 @@ use App\Enums\WhatsAppSessionStatus;
 use App\Jobs\ManageWhatsAppSession;
 use App\Models\WhatsAppSession;
 use App\Services\WhatsAppSessionLifecycleService;
+use App\Services\WhatsAppSessionRuntimeEligibility;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,8 +26,12 @@ final class PlatformWhatsAppSessionController extends Controller
         return view('platform.whatsapp.index', compact('sessions', 'search'));
     }
 
-    public function reconnect(WhatsAppSession $session, WhatsAppSessionLifecycleService $lifecycle): RedirectResponse
+    public function reconnect(WhatsAppSession $session, WhatsAppSessionLifecycleService $lifecycle, WhatsAppSessionRuntimeEligibility $eligibility): RedirectResponse
     {
+        if (! $eligibility->eligible($session)) {
+            return back()->withErrors(['session' => 'This tenant is suspended or its subscription does not currently permit WhatsApp runtime access.']);
+        }
+
         $target = $session->status === WhatsAppSessionStatus::Failed ? WhatsAppSessionStatus::Initializing : WhatsAppSessionStatus::Reconnecting;
         $lifecycle->transition($session, $target, 'platform');
         $session->increment('reconnect_attempts');
