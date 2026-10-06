@@ -4,10 +4,10 @@ namespace App\Services;
 
 use App\Models\PlatformAuditLog;
 use App\Models\PlatformIncident;
-use App\Models\WhatsAppMessage;
-use App\Models\WhatsAppSession;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\WhatsAppMessage;
+use App\Models\WhatsAppSession;
 use Illuminate\Support\Facades\DB;
 
 final class PlatformDashboardQuery
