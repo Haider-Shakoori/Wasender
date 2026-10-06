@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 final class ProcessIntegrationMessageService
 {
-    public function __construct(private PhoneNumberNormalizer $phones, private WhatsAppMessageService $messages, private CreateTransactionalWhatsAppMessageFromTemplateService $templates) {}
+    public function __construct(private PhoneNumberNormalizer $phones, private WhatsAppMessageService $messages, private CreateTransactionalWhatsAppMessageFromTemplateService $templates, private PublishIntegrationMessageWebhookService $webhooks) {}
 
     public function send(Integration $integration, User $actor, array $data): WhatsAppMessage
     {
@@ -25,6 +25,33 @@ final class ProcessIntegrationMessageService
         $sessionUuid = $data['session_uuid'] ?? data_get($integration->configuration, 'default_session_uuid');
         $key = 'integration:'.$integration->uuid.':'.$data['idempotency_key'];
 
-        return isset($data['template_uuid']) ? $this->templates->create($integration->tenant, $actor, ['session_uuid' => $sessionUuid, 'recipient' => $data['recipient'], 'template_uuid' => $data['template_uuid'], 'template_version_uuid' => $data['template_version_uuid'] ?? null, 'values' => $data['variables'] ?? [], 'timezone' => $integration->tenant->timezone, 'idempotency_key' => $key]) : $this->messages->create($integration->tenant, $actor, ['session_uuid' => $sessionUuid, 'recipient' => $data['recipient'], 'message_type' => 'text', 'body' => $data['text'], 'idempotency_key' => $key, 'metadata' => ['source' => 'integration', 'integration_uuid' => $integration->uuid]], null);
+        $metadata = ['source' => 'integration', 'integration_uuid' => $integration->uuid];
+        $message = isset($data['template_uuid'])
+            ? $this->templates->create($integration->tenant, $actor, [
+                'session_uuid' => $sessionUuid,
+                'recipient' => $data['recipient'],
+                'template_uuid' => $data['template_uuid'],
+                'template_version_uuid' => $data['template_version_uuid'] ?? null,
+                'values' => $data['variables'] ?? [],
+                'timezone' => $integration->tenant->timezone,
+                'idempotency_key' => $key,
+                'metadata' => $metadata,
+            ])
+            : $this->messages->create($integration->tenant, $actor, [
+                'session_uuid' => $sessionUuid,
+                'recipient' => $data['recipient'],
+                'message_type' => 'text',
+                'body' => $data['text'],
+                'idempotency_key' => $key,
+                'metadata' => $metadata,
+            ], null);
+
+        try {
+            $this->webhooks->publish($message);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        return $message;
     }
 }
