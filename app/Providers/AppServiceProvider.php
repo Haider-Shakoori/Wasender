@@ -13,6 +13,8 @@ use App\Contracts\WhatsAppCampaignTransport;
 use App\Contracts\WhatsAppMessageTemplateUsageReference;
 use App\Events\InboxConversationCreated;
 use App\Events\InboxMessageReceived;
+use App\Events\WhatsAppMessageStatusChanged;
+use App\Listeners\QueueIntegrationMessageWebhook;
 use App\Listeners\QueueIntegrationOutboundWebhook;
 use App\Listeners\QueueWhatsAppChatbotProcessing;
 use App\Models\AuditLog;
@@ -91,6 +93,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('template-preview', fn (Request $request) => Limit::perMinute(config('security.rates.template_preview'))->by('user:'.$request->user()?->id));
         Event::listen(InboxMessageReceived::class, QueueWhatsAppChatbotProcessing::class);
         Event::listen(InboxMessageReceived::class, QueueIntegrationOutboundWebhook::class);
+        Event::listen(WhatsAppMessageStatusChanged::class, QueueIntegrationMessageWebhook::class);
         Event::listen(InboxConversationCreated::class, QueueIntegrationOutboundWebhook::class);
         Gate::policy(Tenant::class, TenantPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
