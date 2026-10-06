@@ -155,3 +155,27 @@ jobs:
           cache-dependency-path: whatsapp-service/package-lock.json
       - run: npm ci
       - run: npm run build
+
+
+  deployment-package:
+    name: Production deployment package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare non-secret CI environment
+        run: |
+          cp deploy/env/laravel.env.example .env
+          cp deploy/env/whatsapp.env.example whatsapp-service/.env
+          sed -i 's|^APP_KEY=.*|APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=|' .env
+          sed -i 's|^DB_PASSWORD=.*|DB_PASSWORD=ci-db-password|' .env
+          sed -i 's|^MYSQL_PASSWORD=.*|MYSQL_PASSWORD=ci-db-password|' .env
+          sed -i 's|^MYSQL_ROOT_PASSWORD=.*|MYSQL_ROOT_PASSWORD=ci-root-password|' .env
+          sed -i 's|^REDIS_PASSWORD=.*|REDIS_PASSWORD=ci-redis-password|' .env
+          sed -i 's|^WHATSAPP_HMAC_SECRET=.*|WHATSAPP_HMAC_SECRET=ci-hmac-secret|' .env
+          sed -i 's|^WHATSAPP_CALLBACK_KEY=.*|WHATSAPP_CALLBACK_KEY=ci-callback-key|' .env
+          sed -i 's|^WHATSAPP_HMAC_SECRET=.*|WHATSAPP_HMAC_SECRET=ci-hmac-secret|' whatsapp-service/.env
+      - name: Validate shell scripts
+        run: bash -n deploy/scripts/preflight.sh docker/whatsapp/entrypoint.sh
+      - name: Validate Docker Compose
+        run: docker compose -f compose.production.yml config --quiet
