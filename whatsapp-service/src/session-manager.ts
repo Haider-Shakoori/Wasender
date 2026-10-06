@@ -179,7 +179,7 @@ export class SessionManager implements SessionRuntime {
       const page = runtime.client.pupPage;
       if (!page) return false;
       return page.evaluate(() => {
-        const bridge = window.WWebJS;
+        const bridge = (window as unknown as { WWebJS?: { getChat?: unknown; sendMessage?: unknown; getMessageModel?: unknown } }).WWebJS;
         return typeof bridge !== 'undefined'
           && typeof bridge.getChat === 'function'
           && typeof bridge.sendMessage === 'function'
