@@ -1,4 +1,5 @@
 import { fork, type ChildProcess } from 'node:child_process';
+import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import type { CallbackClient } from './callback-client.js';
@@ -34,6 +35,7 @@ export class SessionSupervisor implements SessionRuntime {
 
   async initialize(input: SessionInput): Promise<void> {
     if (this.workers.has(input.session_uuid)) return;
+    if (this.workers.size >= this.config.sessionWorkers.maxActive) throw new Error('session_worker_capacity_exceeded');
     this.crashLoops.delete(input.session_uuid);
     const record = this.spawn(input);
     await this.request(record, 'initialize', input);
@@ -134,6 +136,7 @@ export class SessionSupervisor implements SessionRuntime {
     const states = [...this.workers.values()].map((worker) => worker.state);
 
     const memory = process.memoryUsage();
+    const disk = this.diskHealth();
 
     return {
       isolation: 'process',
@@ -142,6 +145,12 @@ export class SessionSupervisor implements SessionRuntime {
       memory_rss_mb: Math.round(memory.rss / 1_048_576),
       memory_heap_used_mb: Math.round(memory.heapUsed / 1_048_576),
       owned_sessions: this.workers.size,
+      worker_capacity: this.config.sessionWorkers.maxActive,
+      worker_capacity_remaining: Math.max(0, this.config.sessionWorkers.maxActive - this.workers.size),
+      worker_capacity_used_percent: Math.round((this.workers.size / this.config.sessionWorkers.maxActive) * 100),
+      auth_disk_used_percent: disk.usedPercent,
+      auth_disk_free_mb: disk.freeMb,
+      auth_disk_critical: disk.usedPercent !== null && disk.usedPercent >= this.config.sessionWorkers.diskCriticalPercent,
       ready_sessions: states.filter((state) => state === 'ready').length,
       reconnecting_sessions: states.filter((state) => state === 'reconnecting').length + this.restartTimers.size,
       crash_loop_sessions: this.crashLoops.size,
@@ -183,6 +192,22 @@ export class SessionSupervisor implements SessionRuntime {
     }));
 
     this.workers.clear();
+  }
+
+  private diskHealth(): { usedPercent: number | null; freeMb: number | null } {
+    try {
+      const stats = fs.statfsSync(this.config.authRoot);
+      const total = Number(stats.blocks) * Number(stats.bsize);
+      const free = Number(stats.bavail) * Number(stats.bsize);
+      if (total <= 0) return { usedPercent: null, freeMb: null };
+
+      return {
+        usedPercent: Math.round(((total - free) / total) * 100),
+        freeMb: Math.round(free / 1_048_576),
+      };
+    } catch {
+      return { usedPercent: null, freeMb: null };
+    }
   }
 
   private spawn(input: SessionInput): WorkerRecord {
