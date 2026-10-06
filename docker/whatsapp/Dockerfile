@@ -16,6 +16,12 @@ ENV PUPPETEER_CACHE_DIR=/opt/puppeteer
 COPY whatsapp-service/package.json whatsapp-service/package-lock.json ./
 RUN npm ci
 
+# whatsapp-web.js 1.34.6 can lose its Puppeteer execution context while
+# WhatsApp performs a SPA navigation during authentication/session restore.
+# Pin the upstream Client.js fix from commit 1780711 for deterministic builds.
+COPY docker/whatsapp/patches/whatsapp-web-client-1780711.js /app/node_modules/whatsapp-web.js/src/Client.js
+COPY docker/whatsapp/patches/WHATSAPP_WEB_JS_LICENSE.txt /usr/share/doc/wasender/WHATSAPP_WEB_JS_LICENSE.txt
+
 COPY whatsapp-service ./
 RUN npm run typecheck \
     && npm test \
