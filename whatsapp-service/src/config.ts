@@ -15,6 +15,7 @@ export type Config = {
   authRoot: string;
   chromiumPath?: string;
   callbackTimeoutMs: number;
+  callbackOutboxRoot: string;
   maxReconnectAttempts: number;
   messageRequests: {
     storePath: string;
@@ -67,6 +68,7 @@ export function loadConfig(): Config {
     authRoot: path.resolve(process.env.WHATSAPP_AUTH_ROOT ?? './storage/auth'),
     chromiumPath: process.env.PUPPETEER_EXECUTABLE_PATH,
     callbackTimeoutMs,
+    callbackOutboxRoot: path.resolve(process.env.CALLBACK_OUTBOX_ROOT ?? './storage/callback-outbox'),
     maxReconnectAttempts,
     messageRequests: {
       storePath: path.resolve(process.env.MESSAGE_REQUEST_STORE_PATH ?? './storage/message-requests.json'),
