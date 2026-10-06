@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Contracts\Messaging\MessagingConnector;
 use App\Models\WhatsAppSession;
+use App\Services\WhatsAppSessionRuntimeEligibility;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -33,11 +34,15 @@ final class RestoreWhatsAppSession implements ShouldQueue
         return [10, 30, 60, 120];
     }
 
-    public function handle(MessagingConnector $connector): void
+    public function handle(MessagingConnector $connector, WhatsAppSessionRuntimeEligibility $eligibility): void
     {
         $session = WhatsAppSession::query()
-            ->with('tenant:id,uuid')
+            ->with(['tenant.currentSubscription'])
             ->findOrFail($this->sessionId);
+
+        if (! $eligibility->eligible($session)) {
+            return;
+        }
 
         $connector->createSession([
             'reference' => $session->uuid,
