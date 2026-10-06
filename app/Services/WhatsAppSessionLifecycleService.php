@@ -14,11 +14,11 @@ final class WhatsAppSessionLifecycleService
     private const ALLOWED = [
         'creating' => ['initializing', 'disconnected', 'failed'],
         'initializing' => ['qr_pending', 'authenticated', 'ready', 'disconnected', 'failed'],
-        'qr_pending' => ['authenticating', 'failed', 'disconnected'],
+        'qr_pending' => ['authenticating', 'authenticated', 'ready', 'failed', 'disconnected'],
         'authenticating' => ['authenticated', 'ready', 'failed', 'disconnected'],
         'authenticated' => ['ready', 'failed', 'disconnected'],
         'ready' => ['reconnecting', 'disconnected', 'failed', 'deleting'],
-        'reconnecting' => ['ready', 'qr_pending', 'disconnected', 'failed'],
+        'reconnecting' => ['authenticated', 'ready', 'qr_pending', 'disconnected', 'failed'],
         'disconnected' => ['initializing', 'reconnecting', 'qr_pending', 'deleting'],
         'failed' => ['initializing', 'deleting'],
         'deleting' => ['deleted'],
