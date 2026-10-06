@@ -1,0 +1,47 @@
+name: Current WhatsApp runtime hotfix
+
+on:
+  push:
+    branches:
+      - hotfix-whatsapp-current-runtime
+
+permissions:
+  contents: write
+
+concurrency:
+  group: whatsapp-current-runtime-hotfix
+  cancel-in-progress: true
+
+jobs:
+  refresh-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hotfix-whatsapp-current-runtime
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: whatsapp-service/package-lock.json
+      - name: Refresh lockfile
+        working-directory: whatsapp-service
+        run: npm install "whatsapp-web.js@https://github.com/wwebjs/whatsapp-web.js/archive/064a3d5a5a3dce1281a6a12740b5a7051339d154.tar.gz" --save-exact --package-lock-only --ignore-scripts
+      - name: Install and verify
+        working-directory: whatsapp-service
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+      - name: Commit lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add whatsapp-service/package.json whatsapp-service/package-lock.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore: refresh current WhatsApp runtime lockfile"
+          git push origin HEAD:hotfix-whatsapp-current-runtime
