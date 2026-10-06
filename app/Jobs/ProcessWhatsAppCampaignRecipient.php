@@ -16,6 +16,7 @@ use App\Services\Campaigns\CampaignRecipientEligibilityService;
 use App\Services\Campaigns\CampaignSessionSelector;
 use App\Services\Campaigns\CampaignTransportRequestBuilder;
 use App\Services\Campaigns\ProcessWhatsAppCampaignConnectorEventService;
+use App\Services\WhatsAppSessionPacer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -37,7 +38,7 @@ final class ProcessWhatsAppCampaignRecipient implements ShouldQueue
         return [(new WithoutOverlapping("wa-recipient-execution:{$this->recipientExecutionId}"))->expireAfter(120)];
     }
 
-    public function handle(TenantContext $context, CampaignRecipientEligibilityService $eligibility, CampaignSessionSelector $selector, CampaignTransportRequestBuilder $builder, WhatsAppCampaignTransport $transport, ProcessWhatsAppCampaignConnectorEventService $processor): void
+    public function handle(TenantContext $context, CampaignRecipientEligibilityService $eligibility, CampaignSessionSelector $selector, CampaignTransportRequestBuilder $builder, WhatsAppCampaignTransport $transport, ProcessWhatsAppCampaignConnectorEventService $processor, WhatsAppSessionPacer $pacer): void
     {
         $row = WhatsAppCampaignRecipientExecution::with(['execution.tenant', 'execution.campaign.activePreparation', 'execution.campaign.attachment', 'recipient.contact'])->findOrFail($this->recipientExecutionId);
         $context->set($row->execution->tenant);
@@ -76,6 +77,14 @@ final class ProcessWhatsAppCampaignRecipient implements ShouldQueue
 
                 return;
             }
+
+            $waitMs = $pacer->reserve($session);
+            if ($waitMs > 0) {
+                self::dispatch($row->id)->delay(now()->addMilliseconds($waitMs));
+
+                return;
+            }
+
             $attempt = DB::transaction(function () use ($row, $session) {
                 WhatsAppSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
                 $inflight = WhatsAppCampaignRecipientExecution::where('session_id', $session->id)->whereIn('status', ['processing'])->count();
