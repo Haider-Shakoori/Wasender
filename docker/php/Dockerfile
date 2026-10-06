@@ -36,12 +36,15 @@ RUN apt-get update \
 
 WORKDIR /var/www/html
 
-COPY --from=vendor /app /var/www/html
-COPY --from=frontend /app/public/build /var/www/html/public/build
+COPY --chown=www-data:www-data --from=vendor /app /var/www/html
+COPY --chown=www-data:www-data --from=frontend /app/public/build /var/www/html/public/build
 COPY docker/php/zz-wasender.ini /usr/local/etc/php/conf.d/zz-wasender.ini
 
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+    && chown -R www-data:www-data /var/www/html \
+    && find /var/www/html -type d -exec chmod 0755 {} + \
+    && find /var/www/html -type f -exec chmod 0644 {} + \
+    && chmod 0755 artisan
 
 USER www-data
 
