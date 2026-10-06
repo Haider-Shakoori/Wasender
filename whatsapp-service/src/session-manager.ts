@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import QRCode from 'qrcode';
 import pkg from 'whatsapp-web.js';
 import type { Message } from 'whatsapp-web.js';
@@ -21,7 +22,8 @@ export class SessionManager {
   constructor(private readonly config: Config, private readonly callbacks: CallbackClient) {
     this.instanceId = config.instanceId ?? process.env.HOSTNAME ?? `connector-${process.pid}`;
     this.leaseTtlMs = config.sessionLeaseTtlMs ?? 180_000;
-    fs.mkdirSync(config.authRoot, { recursive: true });
+    fs.mkdirSync(config.authRoot, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(config.authRoot, 0o700); } catch { /* filesystem may not support chmod */ }
   }
 
   private validate(input: SessionInput): void {
@@ -255,13 +257,14 @@ export class SessionManager {
     const leasePath = path.join(directory, `${uuid}.json`);
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        fs.writeFileSync(leasePath, JSON.stringify({ owner: this.instanceId, expires_at: Date.now() + this.leaseTtlMs }), { flag: 'wx', mode: 0o600 });
+        fs.writeFileSync(leasePath, JSON.stringify({ owner: this.instanceId, host: os.hostname(), pid: process.pid, expires_at: Date.now() + this.leaseTtlMs }), { flag: 'wx', mode: 0o600 });
         return leasePath;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
         try {
-          const existing = JSON.parse(fs.readFileSync(leasePath, 'utf8')) as { expires_at?: number };
-          if ((existing.expires_at ?? 0) > Date.now()) throw new Error('session_owned_by_healthy_connector');
+          const existing = JSON.parse(fs.readFileSync(leasePath, 'utf8')) as { expires_at?: number; host?: string; pid?: number };
+          const sameHostDeadProcess = existing.host === os.hostname() && Number.isInteger(existing.pid) && !this.processAlive(existing.pid!);
+          if (!sameHostDeadProcess && (existing.expires_at ?? 0) > Date.now()) throw new Error('session_owned_by_healthy_connector');
           fs.unlinkSync(leasePath);
         } catch (readError) {
           if (readError instanceof Error && readError.message === 'session_owned_by_healthy_connector') throw readError;
@@ -276,11 +279,21 @@ export class SessionManager {
     try {
       const lease = JSON.parse(fs.readFileSync(runtime.leasePath, 'utf8')) as { owner?: string };
       if (lease.owner !== this.instanceId) throw new Error('session_lease_lost');
-      fs.writeFileSync(runtime.leasePath, JSON.stringify({ owner: this.instanceId, expires_at: Date.now() + this.leaseTtlMs }), { mode: 0o600 });
+      fs.writeFileSync(runtime.leasePath, JSON.stringify({ owner: this.instanceId, host: os.hostname(), pid: process.pid, expires_at: Date.now() + this.leaseTtlMs }), { mode: 0o600 });
       return true;
     } catch {
       runtime.state = 'lease_lost';
       void runtime.client.destroy();
+      return false;
+    }
+  }
+
+  private processAlive(pid: number): boolean {
+    if (pid <= 0) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
       return false;
     }
   }
