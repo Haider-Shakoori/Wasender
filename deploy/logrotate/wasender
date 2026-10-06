@@ -1,14 +1,3 @@
-/var/www/wasender/shared/storage/logs/*.log {
-    daily
-    missingok
-    rotate 14
-    compress
-    delaycompress
-    notifempty
-    copytruncate
-    create 0640 wasender www-data
-}
-
 /var/log/nginx/wasender.*.log {
     daily
     missingok
