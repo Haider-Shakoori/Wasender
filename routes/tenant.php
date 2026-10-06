@@ -70,7 +70,7 @@ Route::middleware(['auth', 'verified', 'user.active'])->prefix('app')->name('ten
         Route::prefix('integrations')->name('integrations.')->middleware(['tenant.subscription', 'tenant.feature:integrations.access'])->group(function (): void {
             Route::get('/', [IntegrationController::class, 'index'])->middleware('tenant.permission:integrations.view')->name('index');
             Route::get('create', [IntegrationController::class, 'create'])->middleware('tenant.permission:integrations.create')->name('create');
-            Route::post('/', [IntegrationController::class, 'store'])->middleware('tenant.permission:integrations.create')->name('store');
+            Route::post('/', [IntegrationController::class, 'store'])->middleware(['tenant.permission:integrations.create', 'tenant.capacity:integrations.max'])->name('store');
             Route::get('{integration}', [IntegrationController::class, 'show'])->middleware('tenant.permission:integrations.view')->name('show');
             Route::get('{integration}/edit', [IntegrationController::class, 'edit'])->middleware('tenant.permission:integrations.update')->name('edit');
             Route::put('{integration}', [IntegrationController::class, 'update'])->middleware('tenant.permission:integrations.update')->name('update');
@@ -82,7 +82,7 @@ Route::middleware(['auth', 'verified', 'user.active'])->prefix('app')->name('ten
         Route::prefix('chatbots')->name('chatbots.')->middleware(['tenant.subscription', 'tenant.feature:chatbots.access'])->group(function (): void {
             Route::get('/', [WhatsAppChatbotController::class, 'index'])->middleware('tenant.permission:chatbots.view')->name('index');
             Route::get('create', [WhatsAppChatbotController::class, 'create'])->middleware('tenant.permission:chatbots.create')->name('create');
-            Route::post('/', [WhatsAppChatbotController::class, 'store'])->middleware('tenant.permission:chatbots.create')->name('store');
+            Route::post('/', [WhatsAppChatbotController::class, 'store'])->middleware(['tenant.permission:chatbots.create', 'tenant.capacity:chatbots.max'])->name('store');
             Route::get('{chatbot}', [WhatsAppChatbotController::class, 'show'])->middleware('tenant.permission:chatbots.view')->name('show');
             Route::get('{chatbot}/edit', [WhatsAppChatbotController::class, 'edit'])->middleware('tenant.permission:chatbots.update')->name('edit');
             Route::put('{chatbot}', [WhatsAppChatbotController::class, 'update'])->middleware('tenant.permission:chatbots.update')->name('update');
