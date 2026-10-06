@@ -52,8 +52,10 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('whatsapp_message_template_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('whatsapp_message_template_version_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('whatsapp_message_template_id')->nullable();
+            $table->foreign('whatsapp_message_template_id', 'wa_tpl_usage_template_fk')->references('id')->on('whatsapp_message_templates')->nullOnDelete();
+            $table->foreignId('whatsapp_message_template_version_id')->nullable();
+            $table->foreign('whatsapp_message_template_version_id', 'wa_tpl_usage_version_fk')->references('id')->on('whatsapp_message_template_versions')->nullOnDelete();
             $table->uuid('template_uuid');
             $table->uuid('template_version_uuid');
             $table->string('usage_type', 24);

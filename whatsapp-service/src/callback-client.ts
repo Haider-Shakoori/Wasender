@@ -4,6 +4,7 @@ import { CallbackOutbox, type CallbackRecord } from './callback-outbox.js';
 
 export class CallbackClient {
   private readonly outbox?: CallbackOutbox;
+  private readonly inFlight = new Set<string>();
   private readonly timer?: NodeJS.Timeout;
 
   constructor(
@@ -97,7 +98,9 @@ export class CallbackClient {
   }
 
   private async deliverRecord(record: CallbackRecord): Promise<void> {
-    if (!this.outbox) return;
+    if (!this.outbox || this.inFlight.has(record.id)) return;
+
+    this.inFlight.add(record.id);
     try {
       await this.deliver(record);
       this.outbox.delivered(record.id);
@@ -105,6 +108,8 @@ export class CallbackClient {
       const delay = Math.min(15 * 60_000, 1000 * 2 ** Math.min(record.attempts, 10));
       this.outbox.retry(record.id, delay);
       throw error;
+    } finally {
+      this.inFlight.delete(record.id);
     }
   }
 

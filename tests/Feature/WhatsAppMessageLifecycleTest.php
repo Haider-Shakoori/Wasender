@@ -35,6 +35,18 @@ final class WhatsAppMessageLifecycleTest extends TestCase
         app(WhatsAppMessageLifecycleService::class)->transition($this->message(WhatsAppMessageStatus::Sent), WhatsAppMessageStatus::Cancelled, 'user');
     }
 
+    public function test_message_history_keeps_session_relation_after_session_removal(): void
+    {
+        $message = $this->message(WhatsAppMessageStatus::Sent);
+        $sessionId = $message->whatsapp_session_id;
+        WhatsAppSession::query()->findOrFail($sessionId)->delete();
+
+        $reloaded = WhatsAppMessage::query()->with('session')->findOrFail($message->id);
+
+        $this->assertNotNull($reloaded->session);
+        $this->assertSame($sessionId, $reloaded->session->id);
+    }
+
     private function message(WhatsAppMessageStatus $status): WhatsAppMessage
     {
         $user = User::factory()->create();

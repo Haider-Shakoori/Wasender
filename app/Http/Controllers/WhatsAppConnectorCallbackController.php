@@ -22,21 +22,31 @@ final class WhatsAppConnectorCallbackController extends Controller
             'platform' => ['nullable', 'string', 'max:40'], 'wid' => ['nullable', 'string', 'max:100'],
         ]);
         $session = WhatsAppSession::where('uuid', $data['reference'])->firstOrFail();
-        if (DB::table('whatsapp_callback_events')->where('event_uuid', $data['event_id'])->exists()) {
-            return response()->json(['accepted' => true, 'duplicate' => true]);
-        }
-        DB::transaction(function () use ($data, $session, $lifecycle): void {
-            DB::table('whatsapp_callback_events')->insert(['event_uuid' => $data['event_id'], 'whatsapp_session_id' => $session->id, 'event' => $data['event'], 'processed_at' => now()]);
+
+        $processed = DB::transaction(function () use ($data, $session, $lifecycle): bool {
+            $inserted = DB::table('whatsapp_callback_events')->insertOrIgnore([
+                'event_uuid' => $data['event_id'],
+                'whatsapp_session_id' => $session->id,
+                'event' => $data['event'],
+                'processed_at' => now(),
+            ]);
+
+            if ($inserted === 0) {
+                return false;
+            }
+
             if ($data['event'] === 'qr') {
                 $lifecycle->recordQr($session, (string) $data['qr']);
 
-                return;
+                return true;
             }
+
             if ($data['event'] === 'heartbeat') {
                 $session->update(['last_seen_at' => now(), 'last_health_check_at' => now()]);
 
-                return;
+                return true;
             }
+
             $target = match ($data['event']) {
                 'authenticating' => WhatsAppSessionStatus::Authenticating,
                 'authenticated' => WhatsAppSessionStatus::Authenticated,
@@ -44,12 +54,24 @@ final class WhatsAppConnectorCallbackController extends Controller
                 'disconnected' => WhatsAppSessionStatus::Disconnected,
                 'auth_failure' => WhatsAppSessionStatus::Failed,
             };
+
             if ($target === WhatsAppSessionStatus::Ready) {
-                $session->update(['phone_number' => $data['phone_number'] ?? null, 'display_name' => $data['display_name'] ?? null, 'platform' => $data['platform'] ?? null, 'wid' => $data['wid'] ?? null]);
+                $session->update([
+                    'phone_number' => $data['phone_number'] ?? null,
+                    'display_name' => $data['display_name'] ?? null,
+                    'platform' => $data['platform'] ?? null,
+                    'wid' => $data['wid'] ?? null,
+                ]);
             }
+
             $lifecycle->transition($session->refresh(), $target, 'connector', $data['reason_code'] ?? null, $data['message'] ?? null);
+
+            return true;
         }, 3);
 
-        return response()->json(['accepted' => true], 202);
+        return response()->json([
+            'accepted' => true,
+            'duplicate' => ! $processed,
+        ], $processed ? 202 : 200);
     }
 }

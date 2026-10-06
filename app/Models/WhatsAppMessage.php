@@ -39,7 +39,7 @@ final class WhatsAppMessage extends Model
 
     public function session(): BelongsTo
     {
-        return $this->belongsTo(WhatsAppSession::class, 'whatsapp_session_id');
+        return $this->belongsTo(WhatsAppSession::class, 'whatsapp_session_id')->withTrashed();
     }
 
     public function creator(): BelongsTo

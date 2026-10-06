@@ -12,8 +12,10 @@ return new class extends Migration
             $t->id();
             $t->uuid('uuid')->unique();
             $t->foreignId('tenant_id')->constrained()->cascadeOnDelete();
-            $t->foreignId('automation_workflow_execution_id')->constrained()->cascadeOnDelete();
-            $t->foreignId('automation_workflow_step_id')->constrained()->restrictOnDelete();
+            $t->foreignId('automation_workflow_execution_id');
+            $t->foreign('automation_workflow_execution_id', 'auto_step_execution_fk')->references('id')->on('automation_workflow_executions')->cascadeOnDelete();
+            $t->foreignId('automation_workflow_step_id');
+            $t->foreign('automation_workflow_step_id', 'auto_step_definition_fk')->references('id')->on('automation_workflow_steps')->restrictOnDelete();
             $t->string('step_key', 100);
             $t->string('step_type', 32);
             $t->string('status', 24);

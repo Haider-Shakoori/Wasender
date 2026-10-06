@@ -7,23 +7,29 @@ import pkg from 'whatsapp-web.js';
 import type { Message } from 'whatsapp-web.js';
 import type { CallbackClient } from './callback-client.js';
 import type { Config } from './config.js';
+import { WHATSAPP_READY_RECOVERY_DELAYS_MS, shouldRetryReadyInjection, type WhatsAppReadinessProbe } from './readiness-recovery.js';
 import { signature } from './security.js';
+import { canReclaimSessionLease, type SessionLease } from './session-lease.js';
 import type { CampaignSendInput, DirectSendInput, SessionInput, SessionRuntime } from './session-runtime.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
-type Runtime = { client: InstanceType<typeof Client>; state: string; reconnects: number; storageKey: string; tenantUuid?: string; inFlight: number; leasePath: string };
+type Runtime = { client: InstanceType<typeof Client>; state: string; reconnects: number; storageKey: string; tenantUuid?: string; inFlight: number; leasePath: string; readyRecoveryRunning: boolean; sendBridgeRecovery?: Promise<void> };
 
 export class SessionManager implements SessionRuntime {
   private readonly runtimes = new Map<string, Runtime>();
   private readonly sent = new Map<string, { messageUuid?: string; requestId?: string; campaignKey?: string; ack: number }>();
   private readonly instanceId: string;
   private readonly leaseTtlMs: number;
+  private readonly webCacheRoot: string;
   private campaignAcknowledgement?: (campaignKey: string, messageId: string, ack: number) => void;
   constructor(private readonly config: Config, private readonly callbacks: CallbackClient) {
     this.instanceId = config.instanceId ?? process.env.HOSTNAME ?? `connector-${process.pid}`;
     this.leaseTtlMs = config.sessionLeaseTtlMs ?? 180_000;
+    this.webCacheRoot = path.join(config.authRoot, '.wwebjs_cache');
     fs.mkdirSync(config.authRoot, { recursive: true, mode: 0o700 });
+    fs.mkdirSync(this.webCacheRoot, { recursive: true, mode: 0o700 });
     try { fs.chmodSync(config.authRoot, 0o700); } catch { /* filesystem may not support chmod */ }
+    try { fs.chmodSync(this.webCacheRoot, 0o700); } catch { /* filesystem may not support chmod */ }
   }
 
   private validate(input: SessionInput): void {
@@ -38,23 +44,31 @@ export class SessionManager implements SessionRuntime {
     this.validate(input);
     if (this.runtimes.has(input.session_uuid)) return;
     const leasePath = this.acquireLease(input.session_uuid);
+    this.clearStaleChromiumProfileLocks(input.storage_key);
     const client = new Client({
+      authTimeoutMs: this.config.whatsappAuthTimeoutMs ?? 180_000,
       authStrategy: new LocalAuth({ clientId: input.storage_key, dataPath: this.config.authRoot }),
+      webVersionCache: { type: 'local', path: this.webCacheRoot },
       puppeteer: {
         headless: true,
         executablePath: this.config.chromiumPath,
+        protocolTimeout: this.config.chromiumProtocolTimeoutMs ?? 300_000,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
       },
     });
     if (input.tenant_uuid && !/^[0-9a-f-]{36}$/i.test(input.tenant_uuid)) throw new Error('invalid_tenant_identity');
-    const runtime: Runtime = { client, state: 'initializing', reconnects: 0, storageKey: input.storage_key, tenantUuid: input.tenant_uuid, inFlight: 0, leasePath };
+    const runtime: Runtime = { client, state: 'initializing', reconnects: 0, storageKey: input.storage_key, tenantUuid: input.tenant_uuid, inFlight: 0, leasePath, readyRecoveryRunning: false };
     this.runtimes.set(input.session_uuid, runtime);
     client.on('qr', async (qr) => {
       runtime.state = 'qr_pending';
       const png = await QRCode.toDataURL(qr, { errorCorrectionLevel: 'M', margin: 2, width: 320 });
       await this.safeEmit(input.session_uuid, 'qr', { qr: png });
     });
-    client.on('authenticated', () => { runtime.state = 'authenticated'; void this.safeEmit(input.session_uuid, 'authenticated'); });
+    client.on('authenticated', () => {
+      runtime.state = 'authenticated';
+      void this.safeEmit(input.session_uuid, 'authenticated');
+      void this.recoverReadyBridge(input.session_uuid, runtime);
+    });
     client.on('ready', () => {
       runtime.state = 'ready'; runtime.reconnects = 0;
       const info = client.info;
@@ -93,6 +107,7 @@ export class SessionManager implements SessionRuntime {
         code: 'initialization_failed',
         message: error instanceof Error ? error.message.slice(0, 500) : 'WhatsApp initialization failed.',
       });
+      try { await client.destroy(); } catch { /* best-effort cleanup after failed initialization */ }
       this.runtimes.delete(input.session_uuid);
       this.releaseLease(runtime);
       throw error;
@@ -159,6 +174,61 @@ export class SessionManager implements SessionRuntime {
     return { instance_id: this.instanceId, owned_sessions: this.runtimes.size, ready_sessions: [...this.runtimes.values()].filter((runtime) => runtime.state === 'ready').length };
   }
 
+  private async ensureSendBridge(runtime: Runtime, force = false): Promise<void> {
+    const bridgeReady = async (): Promise<boolean> => {
+      const page = runtime.client.pupPage;
+      if (!page) return false;
+      return page.evaluate(() => {
+        const bridge = (window as unknown as { WWebJS?: { getChat?: unknown; sendMessage?: unknown; getMessageModel?: unknown } }).WWebJS;
+        return typeof bridge !== 'undefined'
+          && typeof bridge.getChat === 'function'
+          && typeof bridge.sendMessage === 'function'
+          && typeof bridge.getMessageModel === 'function';
+      }).catch(() => false);
+    };
+
+    if (!force && await bridgeReady()) return;
+    if (runtime.sendBridgeRecovery) {
+      await runtime.sendBridgeRecovery;
+      return;
+    }
+
+    runtime.sendBridgeRecovery = (async () => {
+      const reinjectable = runtime.client as InstanceType<typeof Client> & { inject: () => Promise<void> };
+      await reinjectable.inject();
+
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (await bridgeReady()) return;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      throw new Error('whatsapp_bridge_unavailable');
+    })();
+
+    try {
+      await runtime.sendBridgeRecovery;
+    } finally {
+      runtime.sendBridgeRecovery = undefined;
+    }
+  }
+
+  private async sendWithBridgeRecovery(
+    runtime: Runtime,
+    address: string,
+    content: string | InstanceType<typeof MessageMedia>,
+    options: Record<string, unknown>,
+  ) {
+    await this.ensureSendBridge(runtime);
+    try {
+      return await runtime.client.sendMessage(address, content, options);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("reading 'getChat'") && !message.includes('WWebJS')) throw error;
+      await this.ensureSendBridge(runtime, true);
+      return runtime.client.sendMessage(address, content, options);
+    }
+  }
+
   async send(input: DirectSendInput): Promise<{ accepted: boolean; whatsapp_message_id: string }> {
     if (!/^[0-9a-f-]{36}$/i.test(input.message_uuid) || !/^[0-9a-f-]{36}$/i.test(input.request_id) || !/^[1-9][0-9]{7,14}$/.test(input.recipient)) throw new Error('invalid_message_request');
     if (input.expires_at && Date.parse(input.expires_at) <= Date.now()) throw new Error('message_expired');
@@ -174,7 +244,7 @@ export class SessionManager implements SessionRuntime {
       if (input.body) options.caption = input.body;
       if (input.type === 'document') options.sendMediaAsDocument = true;
     } else if (!input.body?.trim()) throw new Error('body_required');
-    const result = await runtime.client.sendMessage(`${input.recipient}@c.us`, content, options);
+    const result = await this.sendWithBridgeRecovery(runtime, `${input.recipient}@c.us`, content, options);
     const externalId = result.id._serialized;
     this.sent.set(externalId, { messageUuid: input.message_uuid, requestId: input.request_id, ack: 1 });
     return { accepted: true, whatsapp_message_id: externalId };
@@ -202,7 +272,7 @@ export class SessionManager implements SessionRuntime {
         if (input.body) options.caption = input.body;
         if (input.type === 'document') options.sendMediaAsDocument = true;
       }
-      const result = await runtime.client.sendMessage(input.recipientAddress, content, options);
+      const result = await this.sendWithBridgeRecovery(runtime, input.recipientAddress, content, options);
       const messageId = result.id?._serialized;
       if (!messageId || messageId.length > 512) throw new Error('whatsapp_message_id_missing');
       this.sent.set(messageId, { campaignKey: input.campaignKey, ack: 1 });
@@ -267,9 +337,10 @@ export class SessionManager implements SessionRuntime {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
         try {
-          const existing = JSON.parse(fs.readFileSync(leasePath, 'utf8')) as { expires_at?: number; host?: string; pid?: number };
-          const sameHostDeadProcess = existing.host === os.hostname() && Number.isInteger(existing.pid) && !this.processAlive(existing.pid!);
-          if (!sameHostDeadProcess && (existing.expires_at ?? 0) > Date.now()) throw new Error('session_owned_by_healthy_connector');
+          const existing = JSON.parse(fs.readFileSync(leasePath, 'utf8')) as SessionLease;
+          if (!canReclaimSessionLease(existing, this.instanceId, os.hostname(), (pid) => this.processAlive(pid))) {
+            throw new Error('session_owned_by_healthy_connector');
+          }
           fs.unlinkSync(leasePath);
         } catch (readError) {
           if (readError instanceof Error && readError.message === 'session_owned_by_healthy_connector') throw readError;
@@ -310,6 +381,86 @@ export class SessionManager implements SessionRuntime {
     } catch { /* an expired or replaced lease is not ours to remove */ }
   }
 
+  private clearStaleChromiumProfileLocks(storageKey: string): void {
+    const profile = path.resolve(this.config.authRoot, `session-${storageKey}`);
+    if (!profile.startsWith(`${this.config.authRoot}${path.sep}`) || !fs.existsSync(profile)) return;
+
+    // Lease ownership guarantees no healthy session worker should currently own this
+    // profile. Any Chromium still referencing it is therefore an orphan from a
+    // crashed/replaced worker and must be terminated before LocalAuth can reopen it.
+    if (process.platform === 'linux' && fs.existsSync('/proc')) {
+      for (const entry of fs.readdirSync('/proc')) {
+        if (!/^\d+$/.test(entry)) continue;
+        const pid = Number(entry);
+        if (pid === process.pid) continue;
+        try {
+          const command = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ');
+          if (command.includes(profile) && /(chromium|chrome)/i.test(command)) {
+            process.kill(pid, 'SIGKILL');
+          }
+        } catch {
+          // Processes may exit between directory enumeration and inspection.
+        }
+      }
+    }
+
+    for (const name of ['SingletonLock', 'SingletonCookie', 'SingletonSocket']) {
+      try { fs.rmSync(path.join(profile, name), { force: true }); } catch { /* recreated by Chromium when needed */ }
+    }
+  }
+
+  private async recoverReadyBridge(uuid: string, runtime: Runtime): Promise<void> {
+    if (runtime.readyRecoveryRunning) return;
+    runtime.readyRecoveryRunning = true;
+
+    try {
+      for (const delayMs of WHATSAPP_READY_RECOVERY_DELAYS_MS) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+        if (this.runtimes.get(uuid) !== runtime || ['ready', 'failed', 'disconnected', 'lease_lost'].includes(runtime.state)) return;
+
+        const page = runtime.client.pupPage;
+        if (!page) continue;
+
+        const probe = await page.evaluate(() => {
+          const browserWindow = window as unknown as {
+            require?: (name: string) => { Socket?: { state?: string; hasSynced?: boolean } };
+            WWebJS?: unknown;
+          };
+          const socket = browserWindow.require?.('WAWebSocketModel')?.Socket;
+
+          return {
+            socketState: socket?.state ?? null,
+            hasSynced: socket?.hasSynced === true,
+            bridgeInjected: typeof browserWindow.WWebJS !== 'undefined',
+          };
+        }).catch(() => null) as WhatsAppReadinessProbe | null;
+
+        if (!probe || !shouldRetryReadyInjection(probe)) continue;
+
+        try {
+          const recoverableClient = runtime.client as InstanceType<typeof Client> & { inject: () => Promise<void> };
+          await recoverableClient.inject();
+        } catch (error) {
+          console.warn('WhatsApp ready bridge recovery attempt failed', {
+            session_uuid: uuid,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      if (this.runtimes.get(uuid) === runtime && runtime.state === 'authenticated') {
+        runtime.state = 'failed';
+        await this.safeEmit(uuid, 'auth_failure', {
+          code: 'ready_timeout',
+          message: 'WhatsApp Web authenticated but the client bridge did not become ready after recovery attempts.',
+        });
+      }
+    } finally {
+      runtime.readyRecoveryRunning = false;
+    }
+  }
+
   private async safeEmit(uuid: string, event: string, payload: Record<string, unknown> = {}): Promise<void> {
     try { await this.callbacks.emit(uuid, event, payload); }
     catch (error) { console.error('callback delivery failed', { event, message: error instanceof Error ? error.message : 'unknown' }); }
@@ -324,6 +475,7 @@ export class SessionManager implements SessionRuntime {
     let media: Record<string, unknown> | null = null;
     if (message.hasMedia) {
       const downloaded = await message.downloadMedia();
+      if (!downloaded) return;
       const bytes = Buffer.from(downloaded.data, 'base64');
       if (bytes.length < 1 || bytes.length > 16 * 1024 * 1024) return;
       media = { mime_type: downloaded.mimetype, size_bytes: bytes.length, checksum_sha256: crypto.createHash('sha256').update(bytes).digest('hex'), retrieval_reference: this.stableEventId(`${input.session_uuid}:media:${serializedId}`) };

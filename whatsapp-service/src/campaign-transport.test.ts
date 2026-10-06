@@ -23,6 +23,26 @@ const payload = {
   requested_at: new Date().toISOString(), metadata: { source: 'campaign' },
 };
 
+function runtimeConfig(directory: string): Pick<Config, 'host' | 'callbackOutboxRoot' | 'messageRequests' | 'sessionWorkers'> {
+  return {
+    host: '127.0.0.1',
+    callbackOutboxRoot: path.join(directory, 'callback-outbox'),
+    messageRequests: {
+      storePath: path.join(directory, 'message-requests.json'),
+      ttlMs: 60_000,
+    },
+    sessionWorkers: {
+      enabled: false,
+      requestTimeoutMs: 5_000,
+      maxRestarts: 2,
+      restartWindowMs: 60_000,
+      restartBaseDelayMs: 100,
+      maxActive: 10,
+      diskCriticalPercent: 95,
+    },
+  };
+}
+
 describe('campaign transport safety', () => {
   it('accepts only strict direct-contact dispatches', () => {
     expect(validateCampaignDispatch(payload).recipient.whatsapp_address).toBe('15551234567@c.us');
@@ -43,6 +63,7 @@ describe('campaign transport safety', () => {
   it('returns the prior authoritative result without sending twice', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'campaign-service-'));
     const config: Config = {
+      ...runtimeConfig(directory),
       port: 3100, hmacSecret: 's'.repeat(32), callbackUrl: 'http://127.0.0.1:1/internal/whatsapp/events',
       authRoot: path.join(directory, 'auth'), callbackTimeoutMs: 20, maxReconnectAttempts: 1,
       campaign: {
@@ -72,6 +93,7 @@ describe('campaign transport safety', () => {
   it('rejects a cross-tenant session before invoking the WhatsApp client', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'campaign-session-'));
     const config: Config = {
+      ...runtimeConfig(directory),
       port: 3100, hmacSecret: 's'.repeat(32), callbackUrl: 'http://127.0.0.1:1/internal/whatsapp/events',
       authRoot: path.join(directory, 'auth'), callbackTimeoutMs: 20, maxReconnectAttempts: 1,
       campaign: { enabled: true, storePath: path.join(directory, 'store.json'), laravelBaseUrl: 'http://127.0.0.1:1', maxRequestBytes: 65_536, idempotencyTtlMs: 60_000, maxMediaBytes: 1024, mediaTimeoutMs: 20, sendTimeoutMs: 100, sessionConcurrency: 1, callbackMaxAttempts: 1, callbackBaseDelayMs: 10, callbackMaxDelayMs: 20, correlationRetentionMs: 60_000 },
@@ -85,6 +107,7 @@ describe('campaign transport safety', () => {
   it('blocks checksum-mismatched media before WhatsApp send', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'campaign-media-'));
     const config: Config = {
+      ...runtimeConfig(directory),
       port: 3100, hmacSecret: 's'.repeat(32), callbackUrl: 'http://app.test/internal/whatsapp/events',
       authRoot: path.join(directory, 'auth'), callbackTimeoutMs: 20, maxReconnectAttempts: 1,
       campaign: { enabled: true, storePath: path.join(directory, 'store.json'), laravelBaseUrl: 'http://app.test', maxRequestBytes: 65_536, idempotencyTtlMs: 60_000, maxMediaBytes: 1024, mediaTimeoutMs: 20, sendTimeoutMs: 100, sessionConcurrency: 1, callbackMaxAttempts: 1, callbackBaseDelayMs: 10, callbackMaxDelayMs: 20, correlationRetentionMs: 60_000 },

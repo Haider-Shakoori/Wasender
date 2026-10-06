@@ -13,7 +13,8 @@ return new class extends Migration
             $t->uuid('uuid')->unique();
             $t->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $t->foreignId('automation_workflow_id')->constrained()->restrictOnDelete();
-            $t->foreignId('automation_workflow_version_id')->constrained()->restrictOnDelete();
+            $t->foreignId('automation_workflow_version_id');
+            $t->foreign('automation_workflow_version_id', 'auto_exec_version_fk')->references('id')->on('automation_workflow_versions')->restrictOnDelete();
             $t->string('status', 24);
             $t->string('trigger_type', 64);
             $t->string('trigger_reference', 191)->nullable();

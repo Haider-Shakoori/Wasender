@@ -14,11 +14,11 @@ final class WhatsAppSessionLifecycleService
     private const ALLOWED = [
         'creating' => ['initializing', 'disconnected', 'failed'],
         'initializing' => ['qr_pending', 'authenticated', 'ready', 'disconnected', 'failed'],
-        'qr_pending' => ['authenticating', 'failed', 'disconnected'],
+        'qr_pending' => ['authenticating', 'authenticated', 'ready', 'failed', 'disconnected'],
         'authenticating' => ['authenticated', 'ready', 'failed', 'disconnected'],
         'authenticated' => ['ready', 'failed', 'disconnected'],
         'ready' => ['reconnecting', 'disconnected', 'failed', 'deleting'],
-        'reconnecting' => ['ready', 'qr_pending', 'disconnected', 'failed'],
+        'reconnecting' => ['authenticated', 'ready', 'qr_pending', 'disconnected', 'failed'],
         'disconnected' => ['initializing', 'reconnecting', 'qr_pending', 'deleting'],
         'failed' => ['initializing', 'deleting'],
         'deleting' => ['deleted'],
@@ -43,6 +43,9 @@ final class WhatsAppSessionLifecycleService
             }
 
             $changes = ['status' => $to];
+            if (in_array($to, [Status::Initializing, Status::QrPending, Status::Authenticating, Status::Authenticated, Status::Ready], true)) {
+                $changes += ['failure_code' => null, 'failure_message' => null];
+            }
             if ($to === Status::Authenticated) {
                 $changes['authenticated_at'] = now();
             }
@@ -73,7 +76,7 @@ final class WhatsAppSessionLifecycleService
         }
         Cache::put($this->qrKey($session), encrypt($qr), now()->addSeconds(config('whatsapp.qr_ttl_seconds')));
         $session->increment('qr_generation_count');
-        $session->update(['last_qr_generated_at' => now()]);
+        $session->update(['last_qr_generated_at' => now(), 'failure_code' => null, 'failure_message' => null]);
         if ($session->status !== Status::QrPending) {
             $this->transition($session, Status::QrPending, 'connector');
         }

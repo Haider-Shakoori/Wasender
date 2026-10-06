@@ -13,6 +13,7 @@ use App\Http\Middleware\VerifyWhatsAppConnectorSignature;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,6 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/health',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // The app is only reachable through the private Docker reverse-proxy network.
+        // Trust forwarded scheme/host headers so HTTPS URLs are generated correctly behind Caddy + Nginx.
+        $middleware->trustProxies(
+            at: '*',
+            headers: SymfonyRequest::HEADER_X_FORWARDED_FOR | SymfonyRequest::HEADER_X_FORWARDED_PROTO | SymfonyRequest::HEADER_X_FORWARDED_PREFIX,
+        );
         $middleware->append(AddSecurityHeaders::class);
         $middleware->alias([
             'tenant.context' => ResolveTenantContext::class,
