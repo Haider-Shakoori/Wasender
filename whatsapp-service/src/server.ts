@@ -13,7 +13,7 @@ const sessions = config.sessionWorkers.enabled
   : new SessionManager(config, callbacks);
 const campaigns = new CampaignService(config, sessions, callbacks);
 let draining = false;
-const server = createApp(config, sessions, campaigns, () => draining).listen(config.port, () => console.log(`WhatsApp connector listening on ${config.port}`));
+const server = createApp(config, sessions, campaigns, () => draining).listen(config.port, config.host, () => console.log(`WhatsApp connector listening on ${config.host}:${config.port}`));
 const heartbeat = setInterval(() => void sessions.heartbeat(), 60_000);
 heartbeat.unref();
 
