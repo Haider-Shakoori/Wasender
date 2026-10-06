@@ -31,6 +31,7 @@
     ['Operations','platform.operations','platform.health.view'],
     ['Plans','platform.plans.index','platform.plans.view'],
     ['Billing','platform.billing.index','platform.subscriptions.view'],
+    ['Payment gateways','platform.payment-gateways.index','platform.subscriptions.manage'],
     ['WhatsApp sessions','platform.whatsapp.index','platform.whatsapp.view'],
     ['Outbound messages','platform.messages.index','platform.messages.view'],
     ['Message templates','platform.message-templates.index','platform.whatsapp_templates.view'],
