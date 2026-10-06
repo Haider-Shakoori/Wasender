@@ -17,12 +17,16 @@ FROM php:8.3-fpm-bookworm
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libicu-dev \
+        libonig-dev \
+        libxml2-dev \
         libzip-dev \
         unzip \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
         intl \
+        mbstring \
         opcache \
+        xml \
         pcntl \
         pdo_mysql \
         zip \
