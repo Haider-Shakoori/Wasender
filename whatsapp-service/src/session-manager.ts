@@ -13,7 +13,7 @@ import { canReclaimSessionLease, type SessionLease } from './session-lease.js';
 import type { CampaignSendInput, DirectSendInput, SessionInput, SessionRuntime } from './session-runtime.js';
 
 const { Client, LocalAuth, MessageMedia } = pkg;
-type Runtime = { client: InstanceType<typeof Client>; state: string; reconnects: number; storageKey: string; tenantUuid?: string; inFlight: number; leasePath: string; readyRecoveryRunning: boolean };
+type Runtime = { client: InstanceType<typeof Client>; state: string; reconnects: number; storageKey: string; tenantUuid?: string; inFlight: number; leasePath: string; readyRecoveryRunning: boolean; sendBridgeRecovery?: Promise<void> };
 
 export class SessionManager implements SessionRuntime {
   private readonly runtimes = new Map<string, Runtime>();
@@ -174,6 +174,61 @@ export class SessionManager implements SessionRuntime {
     return { instance_id: this.instanceId, owned_sessions: this.runtimes.size, ready_sessions: [...this.runtimes.values()].filter((runtime) => runtime.state === 'ready').length };
   }
 
+  private async ensureSendBridge(runtime: Runtime, force = false): Promise<void> {
+    const bridgeReady = async (): Promise<boolean> => {
+      const page = runtime.client.pupPage;
+      if (!page) return false;
+      return page.evaluate(() => {
+        const bridge = window.WWebJS;
+        return typeof bridge !== 'undefined'
+          && typeof bridge.getChat === 'function'
+          && typeof bridge.sendMessage === 'function'
+          && typeof bridge.getMessageModel === 'function';
+      }).catch(() => false);
+    };
+
+    if (!force && await bridgeReady()) return;
+    if (runtime.sendBridgeRecovery) {
+      await runtime.sendBridgeRecovery;
+      return;
+    }
+
+    runtime.sendBridgeRecovery = (async () => {
+      const reinjectable = runtime.client as InstanceType<typeof Client> & { inject: () => Promise<void> };
+      await reinjectable.inject();
+
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (await bridgeReady()) return;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      throw new Error('whatsapp_bridge_unavailable');
+    })();
+
+    try {
+      await runtime.sendBridgeRecovery;
+    } finally {
+      runtime.sendBridgeRecovery = undefined;
+    }
+  }
+
+  private async sendWithBridgeRecovery(
+    runtime: Runtime,
+    address: string,
+    content: string | InstanceType<typeof MessageMedia>,
+    options: Record<string, unknown>,
+  ) {
+    await this.ensureSendBridge(runtime);
+    try {
+      return await runtime.client.sendMessage(address, content, options);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("reading 'getChat'") && !message.includes('WWebJS')) throw error;
+      await this.ensureSendBridge(runtime, true);
+      return runtime.client.sendMessage(address, content, options);
+    }
+  }
+
   async send(input: DirectSendInput): Promise<{ accepted: boolean; whatsapp_message_id: string }> {
     if (!/^[0-9a-f-]{36}$/i.test(input.message_uuid) || !/^[0-9a-f-]{36}$/i.test(input.request_id) || !/^[1-9][0-9]{7,14}$/.test(input.recipient)) throw new Error('invalid_message_request');
     if (input.expires_at && Date.parse(input.expires_at) <= Date.now()) throw new Error('message_expired');
@@ -189,7 +244,7 @@ export class SessionManager implements SessionRuntime {
       if (input.body) options.caption = input.body;
       if (input.type === 'document') options.sendMediaAsDocument = true;
     } else if (!input.body?.trim()) throw new Error('body_required');
-    const result = await runtime.client.sendMessage(`${input.recipient}@c.us`, content, options);
+    const result = await this.sendWithBridgeRecovery(runtime, `${input.recipient}@c.us`, content, options);
     const externalId = result.id._serialized;
     this.sent.set(externalId, { messageUuid: input.message_uuid, requestId: input.request_id, ack: 1 });
     return { accepted: true, whatsapp_message_id: externalId };
@@ -217,7 +272,7 @@ export class SessionManager implements SessionRuntime {
         if (input.body) options.caption = input.body;
         if (input.type === 'document') options.sendMediaAsDocument = true;
       }
-      const result = await runtime.client.sendMessage(input.recipientAddress, content, options);
+      const result = await this.sendWithBridgeRecovery(runtime, input.recipientAddress, content, options);
       const messageId = result.id?._serialized;
       if (!messageId || messageId.length > 512) throw new Error('whatsapp_message_id_missing');
       this.sent.set(messageId, { campaignKey: input.campaignKey, ack: 1 });
