@@ -15,7 +15,7 @@ export type Config = {
   callbackUrl: string;
   authRoot: string;
   chromiumPath?: string;
-  chromiumProtocolTimeoutMs: number;
+  chromiumProtocolTimeoutMs?: number;
   callbackTimeoutMs: number;
   callbackOutboxRoot: string;
   maxReconnectAttempts: number;
