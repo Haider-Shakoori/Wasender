@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\WhatsAppInboxMessageStatus;
+use App\Events\WhatsAppMessageStatusChanged;
 use App\Enums\WhatsAppMessageStatus as Status;
 use App\Models\WhatsAppInboxMessage;
 use App\Models\WhatsAppMessage;
@@ -23,14 +24,14 @@ final class WhatsAppMessageLifecycleService
 
     public function transition(WhatsAppMessage $message, Status $to, string $source, array $changes = [], ?string $eventUuid = null): WhatsAppMessage
     {
-        return DB::transaction(function () use ($message, $to, $source, $changes, $eventUuid): WhatsAppMessage {
+        $result = DB::transaction(function () use ($message, $to, $source, $changes, $eventUuid): array {
             $locked = WhatsAppMessage::lockForUpdate()->findOrFail($message->id);
             $from = $locked->status;
             if ($from === $to) {
-                return $locked;
+                return ['message' => $locked, 'changed' => false];
             }
             if ($eventUuid && WhatsAppMessageEvent::where('event_uuid', $eventUuid)->exists()) {
-                return $locked;
+                return ['message' => $locked, 'changed' => false];
             }
             if (! in_array($to->value, self::ALLOWED[$from->value] ?? [], true)) {
                 throw ValidationException::withMessages(['status' => "Cannot transition {$from->value} to {$to->value}."]);
@@ -75,8 +76,14 @@ final class WhatsAppMessageLifecycleService
                 'from_status' => $from->value, 'to_status' => $to->value, 'source' => $source, 'event_uuid' => $eventUuid,
                 'reason_code' => $safe['failure_code'] ?? null, 'message' => $safe['failure_message'] ?? null, 'occurred_at' => now(), 'created_at' => now()]);
 
-            return $locked->refresh();
+            return ['message' => $locked->refresh(), 'changed' => true];
         }, 3);
+
+        if ($result['changed']) {
+            event(new WhatsAppMessageStatusChanged($result['message']));
+        }
+
+        return $result['message'];
     }
 
     public function acknowledge(WhatsAppMessage $message, Status $target, string $eventUuid): WhatsAppMessage
