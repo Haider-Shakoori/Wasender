@@ -9,11 +9,13 @@ use App\Models\Contact;
 use App\Models\ContactGroup;
 use App\Models\ContactLabel;
 use App\Models\ContactSegment;
+use App\Models\Integration;
 use App\Models\Invitation;
 use App\Models\Role;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\WhatsAppCampaign;
+use App\Models\WhatsAppChatbot;
 use App\Models\WhatsAppMessage;
 use App\Models\WhatsAppMessageTemplate;
 use App\Models\WhatsAppSession;
@@ -39,13 +41,15 @@ final class SubscriptionUsageRegistry
             'whatsapp_message_templates.max' => WhatsAppMessageTemplate::forTenant($tenant)->where('status', '!=', 'archived')->count(),
             'whatsapp_message_templates.published_max' => WhatsAppMessageTemplate::forTenant($tenant)->whereNotNull('current_published_version_id')->count(),
             'automations.max' => AutomationWorkflow::forTenant($tenant)->where('status', '!=', 'archived')->count(),
+            'chatbots.max' => WhatsAppChatbot::forTenant($tenant)->where('status', '!=', 'archived')->count(),
+            'integrations.max' => Integration::forTenant($tenant)->where('status', '!=', 'archived')->count(),
             default => 0
         };
     }
 
     public function measurableKeys(): array
     {
-        return ['team_members.max', 'pending_invitations.max', 'roles.custom.max', 'whatsapp_sessions.max', 'messages.monthly', 'contacts.max', 'contact_groups.max', 'contact_labels.max', 'contact_segments.max', 'campaigns.max', 'campaigns.active_max', 'campaigns.monthly_max', 'whatsapp_message_templates.max', 'whatsapp_message_templates.published_max', 'automations.max'];
+        return ['team_members.max', 'pending_invitations.max', 'roles.custom.max', 'whatsapp_sessions.max', 'messages.monthly', 'contacts.max', 'contact_groups.max', 'contact_labels.max', 'contact_segments.max', 'campaigns.max', 'campaigns.active_max', 'campaigns.monthly_max', 'whatsapp_message_templates.max', 'whatsapp_message_templates.published_max', 'automations.max', 'chatbots.max', 'integrations.max'];
     }
 
     public function summary(Tenant $tenant, string $key): array
