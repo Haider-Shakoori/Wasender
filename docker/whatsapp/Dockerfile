@@ -21,6 +21,7 @@ RUN npm ci
 # Pin the upstream Client.js fix from commit 1780711 for deterministic builds.
 COPY docker/whatsapp/patches/whatsapp-web-client-1780711.js /app/node_modules/whatsapp-web.js/src/Client.js
 COPY docker/whatsapp/patches/WHATSAPP_WEB_JS_LICENSE.txt /usr/share/doc/wasender/WHATSAPP_WEB_JS_LICENSE.txt
+RUN chmod 0644 /app/node_modules/whatsapp-web.js/src/Client.js /usr/share/doc/wasender/WHATSAPP_WEB_JS_LICENSE.txt
 
 COPY whatsapp-service ./
 RUN npm run typecheck \
