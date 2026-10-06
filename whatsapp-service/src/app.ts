@@ -4,6 +4,7 @@ import type { Config } from './config.js';
 import { NonceStore, verifySignature } from './security.js';
 import type { SessionRuntime } from './session-runtime.js';
 import { RequestRegistry } from './request-registry.js';
+import type { SendRecord } from './request-registry.js';
 import type { CampaignService } from './campaign-service.js';
 import { uuidPattern } from './campaign-types.js';
 
@@ -20,7 +21,7 @@ export function createApp(config: Config, sessions: SessionRuntime, campaigns?: 
     next();
   });
   app.use('/internal', verifySignature(config.hmacSecret, new NonceStore(300_000, `${config.campaign.storePath}.nonces`)));
-  const requests = new RequestRegistry();
+  const requests = new RequestRegistry(config.messageRequests.storePath, config.messageRequests.ttlMs);
   app.get('/internal/health', (_request, response) => response.json({ status: isDraining() ? 'draining' : 'ok', service: 'whatsapp-session-service', ...sessions.health(), campaign_transport: campaigns?.health() ?? { enabled: false } }));
   app.post('/internal/sessions/:uuid/initialize', asyncRoute(async (request, response) => {
     const uuid = String(request.params.uuid); const state = sessions.status(uuid);
@@ -62,15 +63,31 @@ export function createApp(config: Config, sessions: SessionRuntime, campaigns?: 
   app.post('/internal/messages/send', asyncRoute(async (request, response) => {
     const { record, duplicate } = requests.begin(request.body.request_id, request.body, request.body.message_uuid);
     if (duplicate) {
-      if (!record.result) throw new Error('request_in_progress');
-      response.json(record.result); return;
+      respondWithRequestRecord(record, response);
+      return;
     }
-    record.result = await sessions.send(request.body);
-    response.json(record.result);
+
+    try {
+      const result = await sessions.send(request.body);
+      requests.complete(record.requestId, result);
+      response.json(result);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'connector_error';
+      if (['session_worker_exited', 'session_worker_timeout', 'session_worker_unavailable'].includes(code)) {
+        requests.unknown(record.requestId);
+      } else {
+        requests.fail(record.requestId, code);
+      }
+      throw error;
+    }
   }));
   app.get('/internal/messages/requests/:id', (request, response) => {
     const record = requests.get(String(request.params.id));
-    record?.result ? response.json(record.result) : response.status(404).json({ error: record ? 'request_in_progress' : 'request_not_found' });
+    if (!record) {
+      response.status(404).json({ error: 'request_not_found' });
+      return;
+    }
+    respondWithRequestRecord(record, response);
   });
   app.post('/internal/v1/campaign-messages/send', asyncRoute(async (request, response) => {
     if (!campaigns) { response.status(503).json({ error: 'campaign_transport_disabled' }); return; }
@@ -96,4 +113,23 @@ export function createApp(config: Config, sessions: SessionRuntime, campaigns?: 
 
 function asyncRoute(handler: (request: express.Request, response: express.Response) => Promise<void>) {
   return (request: express.Request, response: express.Response, next: express.NextFunction) => void handler(request, response).catch(next);
+}
+
+function respondWithRequestRecord(record: SendRecord, response: express.Response): void {
+  if (record.status === 'sent' && record.result) {
+    response.json(record.result);
+    return;
+  }
+
+  if (record.status === 'unknown') {
+    response.status(409).json({ error: 'request_outcome_unknown' });
+    return;
+  }
+
+  if (record.status === 'failed') {
+    response.status(422).json({ error: record.error ?? 'connector_rejected' });
+    return;
+  }
+
+  response.status(409).json({ error: 'request_in_progress' });
 }
