@@ -118,6 +118,15 @@ export class SessionManager implements SessionRuntime {
     await this.initialize(input);
   }
 
+  async disconnect(uuid: string): Promise<void> {
+    const runtime = this.runtimes.get(uuid);
+    if (!runtime) return;
+    runtime.state = 'disconnected';
+    await runtime.client.destroy();
+    this.runtimes.delete(uuid);
+    this.releaseLease(runtime);
+  }
+
   async logout(uuid: string): Promise<void> {
     const runtime = this.runtimes.get(uuid);
     if (!runtime) return;
