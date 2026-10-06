@@ -22,6 +22,7 @@ use App\Http\Controllers\TenantMemberController;
 use App\Http\Controllers\TenantRoleController;
 use App\Http\Controllers\TenantSettingsController;
 use App\Http\Controllers\TenantSubscriptionController;
+use App\Http\Controllers\TenantBillingCheckoutController;
 use App\Http\Controllers\TenantTeamController;
 use App\Http\Controllers\ValidateWhatsAppMessageTemplateController;
 use App\Http\Controllers\WhatsAppCampaignActionController;
@@ -143,6 +144,7 @@ Route::middleware(['auth', 'verified', 'user.active'])->prefix('app')->name('ten
         Route::post('/automations/executions/{execution:uuid}/cancel', [AutomationWorkflowExecutionController::class, 'cancel'])->middleware('tenant.permission:automations.cancel_execution')->name('automation-executions.cancel');
         Route::get('/subscription', TenantSubscriptionController::class)->middleware('tenant.permission:billing.view')->name('subscription.show');
         Route::get('/billing', TenantSubscriptionController::class)->middleware('tenant.permission:billing.view')->name('billing.show');
+        Route::post('/billing/checkout', TenantBillingCheckoutController::class)->middleware(['tenant.permission:billing.view', 'throttle:10,1'])->name('billing.checkout');
         Route::middleware(['tenant.subscription', 'tenant.feature:whatsapp.sessions'])->group(function (): void {
             Route::get('/whatsapp-sessions', [WhatsAppSessionController::class, 'index'])->middleware('tenant.permission:sessions.view')->name('whatsapp.index');
             Route::post('/whatsapp-sessions', [WhatsAppSessionController::class, 'store'])->middleware(['tenant.permission:sessions.manage', 'tenant.capacity:whatsapp_sessions.max'])->name('whatsapp.store');

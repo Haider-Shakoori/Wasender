@@ -11,6 +11,7 @@ use App\Http\Controllers\PlatformHealthController;
 use App\Http\Controllers\PlatformIntegrationController;
 use App\Http\Controllers\PlatformNoteController;
 use App\Http\Controllers\PlatformOperationsController;
+use App\Http\Controllers\PlatformPaymentGatewayController;
 use App\Http\Controllers\PlatformPlanController;
 use App\Http\Controllers\PlatformQueueController;
 use App\Http\Controllers\PlatformSecurityController;
@@ -59,6 +60,8 @@ Route::prefix('platform')->name('platform.')->middleware(['auth', 'verified', 'u
     Route::get('operations', PlatformOperationsController::class)->middleware('platform.permission:platform.health.view')->name('operations');
     Route::get('plans', [PlatformPlanController::class, 'index'])->middleware('platform.permission:platform.plans.view')->name('plans.index');
     Route::get('billing', [PlatformBillingController::class, 'index'])->middleware('platform.permission:platform.subscriptions.view')->name('billing.index');
+    Route::get('payment-gateways', [PlatformPaymentGatewayController::class, 'index'])->middleware('platform.permission:platform.subscriptions.manage')->name('payment-gateways.index');
+    Route::put('payment-gateways/{provider}', [PlatformPaymentGatewayController::class, 'update'])->middleware('platform.permission:platform.subscriptions.manage')->name('payment-gateways.update');
     Route::get('tenants/{tenant}/billing', [PlatformBillingController::class, 'show'])->middleware('platform.permission:platform.subscriptions.view')->name('tenants.billing.show');
     Route::post('tenants/{tenant}/billing/payments', [PlatformBillingController::class, 'payment'])->middleware('platform.permission:platform.subscriptions.manage')->name('tenants.billing.payments.store');
     Route::get('plans/create', [PlatformPlanController::class, 'create'])->middleware('platform.permission:platform.plans.manage')->name('plans.create');

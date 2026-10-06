@@ -31,5 +31,31 @@
     @endif
 
     <section class="mt-10"><p class="eyebrow">Billing history</p><h2 class="section-title mt-1">Recent payments</h2><div class="mt-4 table-shell overflow-x-auto"><table class="data-table"><thead><tr><th>Paid</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th></tr></thead><tbody>@forelse($payments as $payment)<tr><td>{{ $payment->paid_at?->format('M j, Y') ?? 'Pending' }}</td><td>{{ $payment->currency }} {{ number_format($payment->amount / 100, 2) }}</td><td>{{ ucfirst($payment->payment_method) }}</td><td>{{ $payment->reference ?: '—' }}</td><td>{{ ucfirst($payment->status) }}</td></tr>@empty<tr><td colspan="5">No payments recorded.</td></tr>@endforelse</tbody></table></div></section>
-    <p class="muted mt-8">Plan changes are handled by a platform administrator. Online checkout is not available.</p>
+    @if($subscription && count($paymentGateways))
+        <section class="panel mt-8">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="eyebrow">Online payment</p>
+                    <h2 class="section-title mt-1">Renew subscription</h2>
+                    <p class="muted mt-2">Available gateways are controlled by the platform administrator.</p>
+                </div>
+                @if(request('payment') === 'success')
+                    <x-badge variant="success">Checkout completed</x-badge>
+                @elseif(request('payment') === 'cancelled')
+                    <x-badge variant="neutral">Checkout cancelled</x-badge>
+                @endif
+            </div>
+            <div class="mt-5 flex flex-wrap gap-3">
+                @foreach($paymentGateways as $gateway)
+                    <form method="post" action="{{ route('tenant.billing.checkout') }}">
+                        @csrf
+                        <input type="hidden" name="provider" value="{{ $gateway['provider'] }}">
+                        <button class="btn-primary">Pay with {{ str($gateway['provider'])->headline() }}</button>
+                    </form>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
+    <p class="muted mt-8">Manual payment remains available through the platform administrator.</p>
 </x-layouts.app>
