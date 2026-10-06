@@ -1,0 +1,1 @@
+<x-layouts.guest title="Page not found"><p class="eyebrow">Error 404</p><h1 class="mt-2 text-2xl font-semibold">Page not found</h1><p class="muted mt-3">The address may be outdated, or the resource may not be available in this workspace.</p><a class="btn-primary mt-6 w-full" href="{{ auth()->check()?route('tenant.dashboard'):route('home') }}">Return safely</a></x-layouts.guest>

@@ -1,0 +1,3 @@
+<?php
+
+return ['max_payload_bytes' => 65536, 'http_timeout_seconds' => 10, 'max_attempts' => 3, 'allow_localhost' => env('INTEGRATIONS_ALLOW_LOCALHOST', false), 'inbound_events' => ['customer.created', 'customer.updated', 'order.created', 'order.processing', 'order.completed', 'order.cancelled', 'order.refunded', 'invoice.created', 'payment.received', 'custom.transaction', 'wordpress.user_registered', 'wordpress.form_submitted', 'wordpress.custom_event'], 'outbound_events' => ['message.queued', 'message.sent', 'message.delivered', 'message.read', 'message.failed', 'campaign.completed', 'campaign.failed', 'automation.completed', 'automation.failed', 'inbox.message.received', 'inbox.conversation.created']];

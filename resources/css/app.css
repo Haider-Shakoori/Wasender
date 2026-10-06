@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+@source '../views/**/*.blade.php';
+@source '../js/**/*.js';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+    color-scheme: light;
+    --page: #f4f7f8;
+    --surface: #ffffff;
+    --surface-subtle: #f7f9fa;
+    --surface-raised: #ffffff;
+    --interactive: #eef3f3;
+    --border: #dce4e5;
+    --border-strong: #c6d1d3;
+    --text: #122225;
+    --text-secondary: #4c6064;
+    --text-muted: #718388;
+    --accent: #087f72;
+    --accent-hover: #07695f;
+    --accent-soft: #e0f4f1;
+    --accent-ink: #ffffff;
+    --success: #07825f;
+    --warning: #a15c06;
+    --danger: #c0344a;
+    --info: #2369b0;
+    --focus: #0c9488;
+    --sidebar: #102326;
+    --sidebar-text: #d9e4e5;
+    --sidebar-muted: #8ca0a4;
+    --sidebar-active: #1b3a3d;
+    --overlay: rgb(8 20 22 / .62);
+    --table-hover: #f5f9f9;
+}
+
+.dark {
+    color-scheme: dark;
+    --page: #091315;
+    --surface: #102023;
+    --surface-subtle: #0d1a1d;
+    --surface-raised: #142629;
+    --interactive: #193034;
+    --border: #233a3e;
+    --border-strong: #365157;
+    --text: #eff6f6;
+    --text-secondary: #b2c2c5;
+    --text-muted: #82969a;
+    --accent: #2fd1bd;
+    --accent-hover: #5bdfce;
+    --accent-soft: #153d3a;
+    --accent-ink: #062825;
+    --success: #43d8a5;
+    --warning: #f3b95f;
+    --danger: #ff788c;
+    --info: #73b7fa;
+    --focus: #52daca;
+    --sidebar: #071113;
+    --sidebar-text: #dce8e9;
+    --sidebar-muted: #789095;
+    --sidebar-active: #173235;
+    --overlay: rgb(0 0 0 / .76);
+    --table-hover: #14272a;
+}
+
+[x-cloak] { display: none !important; }
+
+.platform-theme {
+    --accent: #5b56d6;
+    --accent-hover: #4843bd;
+    --accent-soft: #ecebff;
+    --focus: #6e68e8;
+    --sidebar: #16152c;
+    --sidebar-active: #302d61;
+}
+.dark .platform-theme {
+    --accent: #9d99ff;
+    --accent-hover: #b6b3ff;
+    --accent-soft: #302e61;
+    --accent-ink: #171534;
+    --focus: #aaa6ff;
+    --sidebar: #0d0c1d;
+    --sidebar-active: #292752;
+}
+
+@theme {
+    --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --radius-card: 1rem;
+    --shadow-card: 0 1px 2px rgb(10 30 33 / .04), 0 10px 32px rgb(10 30 33 / .05);
+}
+
+@layer base {
+    * { @apply border-[var(--border)]; }
+    html { @apply scroll-smooth antialiased; }
+    body { @apply min-h-screen bg-[var(--page)] font-sans text-[var(--text)]; }
+    button, a, input, select, textarea { @apply outline-none; }
+    :focus-visible { @apply ring-2 ring-[var(--focus)] ring-offset-2 ring-offset-[var(--page)]; }
+    ::selection { @apply bg-[var(--accent)] text-white; }
+}
+
+@layer components {
+    .app-card { @apply rounded-card border bg-[var(--surface)] shadow-card; }
+    .app-card-subtle { @apply rounded-card border bg-[var(--surface-subtle)]; }
+    .panel { @apply rounded-card border bg-[var(--surface)] p-5 shadow-card sm:p-6; }
+    .field, .form-input {
+        @apply min-h-11 w-full rounded-xl border bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--text)] shadow-sm transition placeholder:text-[var(--text-muted)] hover:border-[var(--border-strong)] focus:border-[var(--focus)] focus:ring-3 focus:ring-[color:color-mix(in_srgb,var(--focus)_18%,transparent)] disabled:cursor-not-allowed disabled:opacity-55;
+    }
+    .btn-primary, .btn-secondary, .btn-danger, .btn-ghost {
+        @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition active:translate-y-px disabled:pointer-events-none disabled:opacity-50;
+    }
+    .btn-primary { @apply bg-[var(--accent)] text-[var(--accent-ink)] shadow-sm hover:bg-[var(--accent-hover)]; }
+    .btn-secondary { @apply border bg-[var(--surface)] text-[var(--text-secondary)] hover:bg-[var(--interactive)] hover:text-[var(--text)]; }
+    .btn-danger { @apply bg-[var(--danger)] text-white hover:brightness-110; }
+    .btn-ghost { @apply text-[var(--text-secondary)] hover:bg-[var(--interactive)] hover:text-[var(--text)]; }
+    .nav-link { @apply flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-[var(--sidebar-muted)] transition hover:bg-white/6 hover:text-[var(--sidebar-text)]; }
+    .nav-active { @apply bg-[var(--sidebar-active)] text-white shadow-[inset_0_0_0_1px_rgb(255_255_255/.06)]; }
+    .nav-disabled { @apply flex min-h-10 cursor-not-allowed items-center gap-3 rounded-xl px-3 text-sm text-[var(--sidebar-muted)] opacity-55; }
+    .eyebrow { @apply text-xs font-bold uppercase tracking-[.16em] text-[var(--accent)]; }
+    .page-title { @apply text-2xl font-semibold tracking-[-.025em] text-[var(--text)] sm:text-3xl; }
+    .section-title { @apply text-base font-semibold tracking-[-.01em] text-[var(--text)]; }
+    .muted { @apply text-sm leading-6 text-[var(--text-muted)]; }
+    .metric-value { @apply text-3xl font-semibold tracking-[-.04em] tabular-nums text-[var(--text)]; }
+    .badge-success, .badge-warning, .badge-danger, .badge-neutral, .badge-info {
+        @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold;
+    }
+    .badge-success { @apply bg-emerald-500/12 text-[var(--success)]; }
+    .badge-warning { @apply bg-amber-500/12 text-[var(--warning)]; }
+    .badge-danger { @apply bg-rose-500/12 text-[var(--danger)]; }
+    .badge-neutral { @apply bg-[var(--interactive)] text-[var(--text-secondary)]; }
+    .badge-info { @apply bg-blue-500/12 text-[var(--info)]; }
+    .table-shell { @apply overflow-hidden rounded-card border bg-[var(--surface)] shadow-card; }
+    .data-table { @apply w-full text-left text-sm; }
+    .data-table thead { @apply bg-[var(--surface-subtle)] text-xs uppercase tracking-[.08em] text-[var(--text-muted)]; }
+    .data-table th { @apply px-5 py-3 font-semibold; }
+    .data-table td { @apply px-5 py-4 align-middle; }
+    .data-table tbody tr { @apply border-t transition hover:bg-[var(--table-hover)]; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

@@ -1,0 +1,4 @@
+<x-layouts.platform title="Queues">
+ <x-page-header eyebrow="Operations" title="Failed jobs" description="Safe operational summaries. Serialized payloads and exceptions are never displayed." />
+ <div class="table-shell mt-6 overflow-x-auto"><table class="data-table"><thead><tr><th>Job ID</th><th>Connection</th><th>Queue</th><th>Failed</th><th></th></tr></thead><tbody>@forelse($failedJobs as $job)<tr><td class="font-mono text-xs">{{ str($job->uuid)->limit(18) }}</td><td>{{ $job->connection }}</td><td>{{ $job->queue }}</td><td>{{ $job->failed_at }}</td><td><a class="btn-ghost" href="{{ route('platform.queues.show',$job->uuid) }}">Review</a></td></tr>@empty<tr><td colspan="5">No failed jobs.</td></tr>@endforelse</tbody></table></div><div class="mt-5">{{ $failedJobs->links() }}</div>
+</x-layouts.platform>

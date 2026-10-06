@@ -1,0 +1,7 @@
+# Integrations
+
+Tenant integrations support Generic REST/Laravel ERP, outbound HTTPS webhooks, WordPress-compatible REST calls, and WooCommerce webhooks. Authenticate API requests with the one-time Bearer token, or sign `timestamp.raw_body` using HMAC-SHA256 in `X-Webhook-Timestamp` and `X-Webhook-Signature`. WooCommerce's `X-WC-Webhook-Signature` is also accepted. Reusing an external event ID or message idempotency key safely returns the existing result.
+
+`POST /api/integrations/{uuid}/messages` queues either bounded plain text or a published message template through canonical transactional messaging and usage accounting. `POST /api/integrations/{uuid}/events` accepts the documented ERP, WordPress, and WooCommerce event set. WooCommerce order/payment events may map directly to frozen template versions using customer name, phone, order number, total, currency, and status variables. WordPress can send user, form, custom, or direct-message calls through the same endpoints; arbitrary form mapping is deferred.
+
+Outbound webhooks are HTTPS-only, HMAC signed, payload-bounded, encrypted in queued jobs, and protected from loopback/private/link-local targets. Delivery records contain hashes and safe status only. Credentials use Laravel encrypted casting, are masked in tenant UI, and never appear in platform views. Shopify is an extension placeholder only; OAuth installation, deeper automation webhook actions, CRM/accounting providers, dedicated Zapier/Make apps, marketplace SDKs, and automated tests are deferred until future scope and final QA.

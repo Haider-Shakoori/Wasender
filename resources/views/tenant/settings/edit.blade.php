@@ -1,0 +1,11 @@
+<x-layouts.app title="Settings">
+    <x-page-header eyebrow="Workspace" title="Settings" description="Manage the identity and regional defaults used across this workspace." />
+    @if($errors->any())<x-alert class="mt-6" variant="danger" title="We couldn’t save these settings">{{ $errors->first() }}</x-alert>@endif
+    <form class="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" method="post" action="{{ route('tenant.settings.update') }}">@csrf @method('PUT')
+        <section class="app-card p-5 sm:p-7"><h2 class="section-title">Workspace profile</h2><p class="muted mt-1">These values are visible to members and used as application defaults.</p><div class="mt-6 space-y-5"><x-input label="Workspace name" name="name" value="{{ $tenant->name }}" required />
+            <label class="block"><span class="mb-2 block text-sm font-medium">Timezone</span><select class="field" name="timezone" required>@foreach($timezones as $timezone)<option value="{{ $timezone }}" @selected(old('timezone',$tenant->timezone)===$timezone)>{{ $timezone }}</option>@endforeach</select>@error('timezone')<span class="mt-1 text-sm text-[var(--danger)]">{{ $message }}</span>@enderror</label>
+            <div class="grid gap-5 sm:grid-cols-2"><label><span class="mb-2 block text-sm font-medium">Currency</span><select class="field" name="currency">@foreach(['USD','EUR','GBP','AED','AFN','PKR','INR'] as $currency)<option @selected(old('currency',$tenant->currency)===$currency)>{{ $currency }}</option>@endforeach</select></label><label><span class="mb-2 block text-sm font-medium">Language</span><select class="field" name="locale"><option value="en" @selected($tenant->locale==='en')>English</option></select></label></div>
+        </div><div class="mt-7 flex justify-end border-t pt-5"><x-button type="submit" loading-label="Saving…">Save changes</x-button></div></section>
+        <aside class="space-y-4"><x-alert variant="info" title="Safe workspace changes">Ownership, status, and activation cannot be changed from this form.</x-alert><div class="app-card-subtle p-5"><p class="text-sm font-medium">Workspace address</p><p class="mt-2 truncate font-mono text-xs text-[var(--text-muted)]">{{ $tenant->slug }}</p><p class="muted mt-3">The workspace URL identity remains stable when its display name changes.</p></div></aside>
+    </form>
+</x-layouts.app>

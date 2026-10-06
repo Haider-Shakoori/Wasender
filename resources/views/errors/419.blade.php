@@ -1,0 +1,1 @@
+<x-layouts.guest title="Page expired"><p class="eyebrow">Session expired</p><h1 class="mt-2 text-2xl font-semibold">Refresh and try again</h1><p class="muted mt-3">The secure form session expired before the request completed. No changes were applied.</p><a class="btn-primary mt-6 w-full" href="{{ url()->previous() }}">Return to the previous page</a></x-layouts.guest>

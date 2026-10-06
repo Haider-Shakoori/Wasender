@@ -1,0 +1,2 @@
+@props(['title', 'description'])
+<div class="px-6 py-14 text-center"><div class="mx-auto grid size-11 place-items-center rounded-xl bg-[var(--accent-soft)] text-xl text-[var(--accent)]" aria-hidden="true">◇</div><h3 class="mt-4 font-semibold">{{ $title }}</h3><p class="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">{{ $description }}</p>@isset($action)<div class="mt-5">{{ $action }}</div>@endisset</div>

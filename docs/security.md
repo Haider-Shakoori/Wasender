@@ -1,0 +1,9 @@
+# Essential security
+
+Authentication uses Laravel password hashing, canonical reset tokens, login/reset throttling, session regeneration, CSRF protection, and full session invalidation on logout. `/app/account/security` supports password changes, masked database-session visibility, individual session logout, and revoking all other sessions. Password changes and resets rotate remember tokens and revoke other sessions. Full TOTP/2FA is deferred because no framework-supported 2FA infrastructure currently exists.
+
+Tenant context and platform permission middleware remain separate authorization boundaries. Current feature permissions are centrally registered without overwriting custom tenant roles. Integration bearer tokens are stored only as hashes; provider secrets use Laravel encrypted casts, remain masked, can be rotated or revoked, and record last use. Signed integration requests use bounded clock skew and nonce replay protection; WooCommerce additionally relies on signed bodies plus event idempotency.
+
+Laravel/connector callbacks require HMAC-SHA256, timestamp, nonce, exact body hash, source identity, bounded payload size, and cache-backed replay rejection. High-risk integration, inbox, automation, chatbot, preview, reset, and credential-rotation endpoints use scoped throttles. Browser responses include practical anti-sniffing, framing, referrer, and permissions headers; strict CSP is deferred to avoid breaking the current Vite/Alpine UI.
+
+Audit metadata is recursively redacted for passwords, tokens, secrets, cookies, sessions, and API keys. Security actions record safe actor/tenant/target references only. Platform security visibility is aggregate and read-only. Enterprise SSO, SAML, SCIM, OIDC, passkeys, SIEM tooling, strict CSP, penetration testing, and automated security tests are deferred until later expansion and final QA.
