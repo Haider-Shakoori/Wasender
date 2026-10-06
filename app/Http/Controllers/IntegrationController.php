@@ -106,6 +106,8 @@ final class IntegrationController extends Controller
         $provider = $data['provider'];
         if ($provider === 'webhook') {
             $urls->validate($data['destination_url'] ?? '');
+        } elseif (filled($data['destination_url'] ?? null)) {
+            $urls->validate($data['destination_url']);
         }
         $configuration = ['default_session_uuid' => $session->uuid];
         foreach (['base_url', 'destination_url', 'store_url'] as $key) {
