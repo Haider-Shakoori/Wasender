@@ -6,6 +6,7 @@ use App\Http\Controllers\HealthController;
 use App\Http\Controllers\InternalWhatsAppCampaignAttachmentController;
 use App\Http\Controllers\InternalWhatsAppMediaController;
 use App\Http\Controllers\PublicInvitationController;
+use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\WhatsAppCampaignConnectorEventController;
 use App\Http\Controllers\WhatsAppConnectorCallbackController;
 use App\Http\Controllers\WhatsAppInboundConnectorEventController;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
 Route::get('/health', HealthController::class)->middleware('throttle:60,1')->name('health');
+Route::post('/billing/webhooks/stripe', StripeWebhookController::class)->middleware('throttle:240,1')->name('billing.webhooks.stripe');
 Route::post('/internal/whatsapp/events', WhatsAppConnectorCallbackController::class)
     ->middleware(['whatsapp.signature', 'throttle:120,1'])
     ->name('internal.whatsapp.events');
