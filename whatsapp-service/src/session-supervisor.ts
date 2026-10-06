@@ -195,6 +195,7 @@ export class SessionSupervisor implements SessionRuntime {
       env: {
         ...process.env,
         CONNECTOR_INSTANCE_ID: `${this.config.instanceId ?? 'connector'}:${input.session_uuid.slice(0, 8)}`,
+        SESSION_WORKER_UUID: input.session_uuid,
       },
     });
 
