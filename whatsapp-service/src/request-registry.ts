@@ -57,8 +57,12 @@ export class RequestRegistry {
 
     const records = Object.values(this.state.records);
     if (records.length >= this.max) {
-      records.sort((a, b) => a.updatedAt - b.updatedAt);
-      delete this.state.records[records[0].requestId];
+      const evictable = records
+        .filter((record) => !['sending', 'unknown'].includes(record.status))
+        .sort((a, b) => a.updatedAt - b.updatedAt);
+
+      if (evictable.length === 0) throw new Error('request_registry_capacity_exceeded');
+      delete this.state.records[evictable[0].requestId];
     }
 
     const record: SendRecord = {
