@@ -26,7 +26,9 @@ COPY whatsapp-service ./
 RUN npm run typecheck \
     && npm test \
     && npm run build \
-    && npm prune --omit=dev
+    && npm prune --omit=dev \
+    && chmod -R a+rX /app/node_modules \
+    && gosu node node -e "require('whatsapp-web.js')"
 
 COPY docker/whatsapp/entrypoint.sh /usr/local/bin/wasender-whatsapp-entrypoint
 RUN chmod +x /usr/local/bin/wasender-whatsapp-entrypoint
