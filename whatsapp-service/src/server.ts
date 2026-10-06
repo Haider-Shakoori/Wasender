@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { createApp } from './app.js';
 import { CallbackClient } from './callback-client.js';
 import { loadConfig } from './config.js';
@@ -6,7 +7,7 @@ import { SessionSupervisor } from './session-supervisor.js';
 import { CampaignService } from './campaign-service.js';
 
 const config = loadConfig();
-const callbacks = new CallbackClient(config.callbackUrl, config.hmacSecret, config.callbackTimeoutMs);
+const callbacks = new CallbackClient(config.callbackUrl, config.hmacSecret, config.callbackTimeoutMs, path.join(config.callbackOutboxRoot, 'connector.json'));
 const sessions = config.sessionWorkers.enabled
   ? new SessionSupervisor(config, callbacks)
   : new SessionManager(config, callbacks);
