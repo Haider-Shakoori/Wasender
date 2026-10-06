@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Contracts\Messaging\MessagingConnector;
+use App\Data\Messaging\ConnectorSessionResult;
 use App\Enums\WhatsAppSessionStatus;
 use App\Jobs\ManageWhatsAppSession;
 use App\Models\Tenant;
@@ -31,7 +32,7 @@ final class WhatsAppSessionDisconnectTest extends TestCase
         ]);
 
         $connector = Mockery::mock(MessagingConnector::class);
-        $connector->shouldReceive('disconnect')->once()->with($session->uuid);
+        $connector->shouldReceive('disconnect')->once()->with($session->uuid)->andReturn(new ConnectorSessionResult($session->uuid, 'disconnected'));
         $connector->shouldNotReceive('logout');
 
         (new ManageWhatsAppSession($session->id, 'disconnect'))
