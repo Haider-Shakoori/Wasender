@@ -31,7 +31,7 @@ final class ManageWhatsAppSession implements ShouldQueue
         $session = WhatsAppSession::withTrashed()->findOrFail($this->sessionId);
         match ($this->action) {
             'reconnect' => $connector->restart($session->uuid),
-            'disconnect' => $connector->logout($session->uuid),
+            'disconnect' => $connector->disconnect($session->uuid),
             'delete' => $connector->delete($session->uuid),
         };
         if ($this->action === 'disconnect') {
