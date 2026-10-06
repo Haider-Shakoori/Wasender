@@ -120,12 +120,20 @@ export class SessionSupervisor implements SessionRuntime {
   health(): Record<string, unknown> {
     const states = [...this.workers.values()].map((worker) => worker.state);
 
+    const memory = process.memoryUsage();
+
     return {
       isolation: 'process',
+      uptime_seconds: Math.floor(process.uptime()),
+      node_version: process.version,
+      memory_rss_mb: Math.round(memory.rss / 1_048_576),
+      memory_heap_used_mb: Math.round(memory.heapUsed / 1_048_576),
       owned_sessions: this.workers.size,
       ready_sessions: states.filter((state) => state === 'ready').length,
       reconnecting_sessions: states.filter((state) => state === 'reconnecting').length + this.restartTimers.size,
       crash_loop_sessions: this.crashLoops.size,
+      worker_restart_limit: this.config.sessionWorkers.maxRestarts,
+      worker_restart_window_seconds: Math.round(this.config.sessionWorkers.restartWindowMs / 1000),
       worker_processes: [...this.workers.values()].map((worker) => ({
         session_uuid: worker.input.session_uuid,
         pid: worker.child.pid ?? null,
