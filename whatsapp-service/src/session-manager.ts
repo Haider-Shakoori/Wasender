@@ -20,12 +20,16 @@ export class SessionManager implements SessionRuntime {
   private readonly sent = new Map<string, { messageUuid?: string; requestId?: string; campaignKey?: string; ack: number }>();
   private readonly instanceId: string;
   private readonly leaseTtlMs: number;
+  private readonly webCacheRoot: string;
   private campaignAcknowledgement?: (campaignKey: string, messageId: string, ack: number) => void;
   constructor(private readonly config: Config, private readonly callbacks: CallbackClient) {
     this.instanceId = config.instanceId ?? process.env.HOSTNAME ?? `connector-${process.pid}`;
     this.leaseTtlMs = config.sessionLeaseTtlMs ?? 180_000;
+    this.webCacheRoot = path.join(config.authRoot, '.wwebjs_cache');
     fs.mkdirSync(config.authRoot, { recursive: true, mode: 0o700 });
+    fs.mkdirSync(this.webCacheRoot, { recursive: true, mode: 0o700 });
     try { fs.chmodSync(config.authRoot, 0o700); } catch { /* filesystem may not support chmod */ }
+    try { fs.chmodSync(this.webCacheRoot, 0o700); } catch { /* filesystem may not support chmod */ }
   }
 
   private validate(input: SessionInput): void {
@@ -44,6 +48,7 @@ export class SessionManager implements SessionRuntime {
     const client = new Client({
       authTimeoutMs: this.config.whatsappAuthTimeoutMs ?? 180_000,
       authStrategy: new LocalAuth({ clientId: input.storage_key, dataPath: this.config.authRoot }),
+      webVersionCache: { type: 'local', path: this.webCacheRoot },
       puppeteer: {
         headless: true,
         executablePath: this.config.chromiumPath,
