@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\PlatformIncident;
 use App\Services\Campaigns\WhatsAppCampaignConnectorHealthQuery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -27,6 +28,8 @@ final class PlatformOperationsService
             'overdue_automations' => DB::table('automation_workflow_executions')->where('status', 'waiting')->where('waiting_until', '<', now())->count(),
             'failed_webhooks' => DB::table('integration_webhook_deliveries')->where('status', 'failed')->count(),
             'inbox_failures' => DB::table('whatsapp_inbox_messages')->where('status', 'failed')->count(),
+            'open_incidents' => PlatformIncident::query()->where('status', 'open')->count(),
+            'recent_incidents' => PlatformIncident::query()->orderByRaw("CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END")->latest('last_seen_at')->limit(20)->get(),
         ];
     }
 }
